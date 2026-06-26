@@ -1,0 +1,7 @@
+@import "tailwindcss";
+
+/* Design tokens added when Phase 1 dashboard UI is built */
+
+body {
+  font-family: Arial, Helvetica, sans-serif;
+}

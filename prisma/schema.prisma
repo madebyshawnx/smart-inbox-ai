@@ -1,0 +1,81 @@
+// Phase 1 schema: sample-email classification + feedback, no Gmail/auth yet.
+// User, ConnectedAccount, PriorityProfile, SmartRule, WorkMode arrive in Phase 2+
+// when there's an actual account to attach them to.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("SMART_INBOX_DATABASE_URL")
+}
+
+model EmailMessage {
+  id          String   @id @default(cuid())
+  sourceId    String   @unique // fixture/sample id, becomes Gmail message id in Phase 2
+  threadId    String?
+  senderName  String
+  senderEmail String
+  subject     String
+  bodyText    String
+  receivedAt  DateTime
+  createdAt   DateTime @default(now())
+
+  classification EmailClassification?
+  feedback       UserFeedback[]
+}
+
+model EmailClassification {
+  id             String       @id @default(cuid())
+  emailMessageId String       @unique
+  emailMessage   EmailMessage @relation(fields: [emailMessageId], references: [id])
+
+  priorityLevel       String // high | medium | low | ignore
+  urgencyLevel        String // urgent | soon | later | none
+  importanceScore     Int
+  confidenceScore     Int
+  category            String
+  subcategory         String?
+  summary              String
+  whyThisMatters       String
+  recommendedNextStep  String
+  detectedDeadline     String?
+  requiresResponse     Boolean
+  requiresDecision     Boolean
+  requiresPayment      Boolean
+  requiresScheduling   Boolean
+  needsFollowUp        Boolean
+  waitingOnReply       Boolean
+  riskIfIgnored        String?
+  suggestedBucket      String
+  safeToIgnore         Boolean
+  modelVersion         String
+  createdAt            DateTime @default(now())
+}
+
+model UserFeedback {
+  id             String       @id @default(cuid())
+  emailMessageId String
+  emailMessage   EmailMessage @relation(fields: [emailMessageId], references: [id])
+  feedbackType   String // correct | wrong | more_like_this | ... (see master prompt)
+  feedbackNotes  String?
+  createdAt      DateTime @default(now())
+}
+
+model DailyEmailBrief {
+  id                  String   @id @default(cuid())
+  briefingDate        DateTime
+  totalEmailsReviewed Int
+  needsAttentionCount Int
+  followUpCount       Int
+  deadlineCount       Int
+  moneyOrAccountCount Int
+  waitingOnReplyCount Int
+  readLaterCount      Int
+  lowPriorityCount    Int
+  safeToIgnoreCount   Int
+  needsReviewCount    Int
+  summary             String
+  createdAt           DateTime @default(now())
+}
