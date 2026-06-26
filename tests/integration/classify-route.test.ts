@@ -50,7 +50,7 @@ vi.mock("@/lib/persistence", () => ({
 // Mock the prisma singleton so importing the route does not construct a client.
 vi.mock("@/lib/db", () => ({ prisma: {} }));
 
-import { POST } from "@/app/api/classify/route";
+import { GET, POST } from "@/app/api/classify/route";
 
 function postRequest(body: unknown): Request {
   return new Request("http://localhost/api/classify", {
@@ -111,6 +111,16 @@ describe("POST /api/classify", () => {
     const firstResult = saveClassifiedEmail.mock.calls[0][2] as ClassifyResult;
     expect(firstRaw.sourceId).toBe("test-email-1");
     expect(firstResult.status).toBe("classified");
+  });
+
+  it("GET returns the sample emails available to classify", async () => {
+    const res = GET();
+    const json = (await res.json()) as { emails: RawEmail[] };
+
+    expect(res.status).toBe(200);
+    expect(Array.isArray(json.emails)).toBe(true);
+    expect(json.emails.length).toBeGreaterThan(0);
+    expect(typeof json.emails[0].sourceId).toBe("string");
   });
 
   it("returns 400 when `emails` is not an array", async () => {

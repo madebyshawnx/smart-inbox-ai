@@ -45,6 +45,16 @@ function toRawEmail(value: RawEmail): RawEmail {
 }
 
 /**
+ * GET /api/classify
+ *
+ * Returns the sample emails available to classify, so the client can drive a
+ * per-email progress counter by POSTing them one at a time.
+ */
+export function GET(): NextResponse {
+  return NextResponse.json({ emails: sampleEmails.map(toRawEmail) });
+}
+
+/**
  * POST /api/classify
  *
  * Body: optional `{ emails?: RawEmail[] }`.
@@ -88,12 +98,20 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   try {
     const client = createAnthropicClient();
+
+    // Classify all emails in parallel — the LLM round-trips are the slow part,
+    // so a batch of N runs in roughly the time of one instead of N in series.
+    const classifications = await Promise.all(emails.map((email) => classifyEmail(email, client)));
+
+    // Persist sequentially: SQLite serializes writes, so concurrent upserts can
+    // contend. The writes are fast, so order them rather than risk a lock.
     let classified = 0;
     let needsReview = 0;
     const results: Array<{ sourceId: string; status: string; suggestedBucket: string }> = [];
 
-    for (const email of emails) {
-      const result = await classifyEmail(email, client);
+    for (let i = 0; i < emails.length; i++) {
+      const email = emails[i];
+      const result = classifications[i];
       await saveClassifiedEmail(prisma, email, result);
 
       if (result.status === "needs_review") {
