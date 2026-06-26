@@ -123,6 +123,43 @@ export async function createRule(db: PrismaClient, input: CreateRuleInput): Prom
   return toDTO(created);
 }
 
+export type EnsureRuleInput = {
+  ruleText: string;
+  priorityWeight?: number;
+};
+
+/**
+ * Create a rule only if no active rule with the same text already exists under
+ * the default profile. Used by the feedback loop so repeatedly clicking e.g.
+ * "Always prioritize this sender" does not pile up duplicate rules.
+ *
+ * @returns `created: false` with the existing rule when a match is found.
+ */
+export async function ensureActiveRule(
+  db: PrismaClient,
+  input: EnsureRuleInput,
+): Promise<{ created: boolean; rule: SmartRuleDTO }> {
+  const ruleText = validateRuleText(input.ruleText);
+  const profile = await getOrCreateDefaultProfile(db);
+
+  const existing = await db.smartRule.findFirst({
+    where: { priorityProfileId: profile.id, ruleText, isActive: true },
+  });
+  if (existing !== null && existing !== undefined) {
+    return { created: false, rule: toDTO(existing) };
+  }
+
+  const created = await db.smartRule.create({
+    data: {
+      priorityProfileId: profile.id,
+      ruleText,
+      isActive: true,
+      priorityWeight: input.priorityWeight ?? 0,
+    },
+  });
+  return { created: true, rule: toDTO(created) };
+}
+
 export type UpdateRulePatch = {
   ruleText?: string;
   isActive?: boolean;

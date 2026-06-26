@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { ALLOWED_FEEDBACK_TYPES, saveFeedback } from "@/lib/persistence";
+import { applyFeedback } from "@/lib/feedback";
+import { ALLOWED_FEEDBACK_TYPES } from "@/lib/persistence";
 
 const feedbackSchema = z.object({
   emailMessageId: z.string().min(1),
@@ -33,8 +34,12 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   try {
-    await saveFeedback(prisma, parsed.data);
-    return NextResponse.json({ ok: true });
+    const result = await applyFeedback(prisma, parsed.data);
+    return NextResponse.json({
+      ok: true,
+      ruleCreated: result.ruleCreated,
+      ruleText: result.ruleText,
+    });
   } catch {
     return NextResponse.json({ error: "Could not save feedback." }, { status: 500 });
   }

@@ -8,7 +8,9 @@ type FeedbackType =
   | "mark_urgent"
   | "not_urgent"
   | "move_to_read_later"
-  | "safe_to_ignore";
+  | "safe_to_ignore"
+  | "always_prioritize_sender"
+  | "usually_ignore_sender";
 
 type FeedbackButtonsProps = {
   emailMessageId: string;
@@ -23,6 +25,8 @@ const ACTIONS: ReadonlyArray<{ type: FeedbackType; label: string }> = [
   { type: "not_urgent", label: "Not urgent" },
   { type: "move_to_read_later", label: "Move to Read Later" },
   { type: "safe_to_ignore", label: "Safe to ignore" },
+  { type: "always_prioritize_sender", label: "Always prioritize this sender" },
+  { type: "usually_ignore_sender", label: "Usually ignore this sender" },
 ];
 
 /**
@@ -32,10 +36,12 @@ const ACTIONS: ReadonlyArray<{ type: FeedbackType; label: string }> = [
 export function FeedbackButtons({ emailMessageId }: FeedbackButtonsProps) {
   const [status, setStatus] = useState<Status>("idle");
   const [pending, setPending] = useState<FeedbackType | null>(null);
+  const [ruleAdded, setRuleAdded] = useState(false);
 
   async function submit(feedbackType: FeedbackType) {
     setStatus("saving");
     setPending(feedbackType);
+    setRuleAdded(false);
     try {
       const res = await fetch("/api/feedback", {
         method: "POST",
@@ -45,6 +51,8 @@ export function FeedbackButtons({ emailMessageId }: FeedbackButtonsProps) {
       if (!res.ok) {
         throw new Error(`Request failed (${res.status})`);
       }
+      const data = (await res.json()) as { ruleCreated?: boolean };
+      setRuleAdded(data.ruleCreated === true);
       setStatus("saved");
     } catch {
       setStatus("error");
@@ -71,7 +79,7 @@ export function FeedbackButtons({ emailMessageId }: FeedbackButtonsProps) {
       ))}
       {status === "saved" && (
         <span className="text-xs font-medium text-[var(--priority-low)]" role="status">
-          Saved ✓
+          {ruleAdded ? "Saved ✓ — Smart Rule added" : "Saved ✓"}
         </span>
       )}
       {status === "error" && (
