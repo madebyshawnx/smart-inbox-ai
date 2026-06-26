@@ -1,3 +1,4 @@
+import { ConnectGmailCard } from "@/components/ConnectGmailCard";
 import { EmptyState } from "@/components/EmptyState";
 import { SmartInboxDashboard } from "@/components/SmartInboxDashboard";
 import { SmartRulesManager } from "@/components/SmartRulesManager";
@@ -27,6 +28,10 @@ export default async function Home() {
         </header>
 
         <main>
+          <div className="mb-8">
+            <ConnectGmailCard />
+          </div>
+
           {hasEmails ? (
             <SmartInboxDashboard data={data} />
           ) : (

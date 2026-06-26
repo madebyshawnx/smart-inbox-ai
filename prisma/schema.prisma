@@ -64,6 +64,20 @@ model UserFeedback {
   createdAt      DateTime @default(now())
 }
 
+model ConnectedAccount {
+  id                    String    @id @default(cuid())
+  provider              String // "google"
+  providerAccountId     String // the connected Gmail address
+  accessTokenEncrypted  String
+  refreshTokenEncrypted String?
+  tokenExpiry           DateTime?
+  scopes                String
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@unique([provider, providerAccountId])
+}
+
 model PriorityProfile {
   id        String   @id @default(cuid())
   name      String
