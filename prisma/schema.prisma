@@ -1,6 +1,7 @@
-// Phase 1 schema: sample-email classification + feedback, no Gmail/auth yet.
-// User, ConnectedAccount, PriorityProfile, SmartRule, WorkMode arrive in Phase 2+
-// when there's an actual account to attach them to.
+// Phase 1: sample-email classification + feedback (no Gmail/auth yet).
+// Phase 3 adds PriorityProfile + SmartRule. A single default profile stands in
+// for per-user profiles until auth arrives.
+// User, ConnectedAccount, WorkMode still come later.
 
 generator client {
   provider = "prisma-client-js"
@@ -61,6 +62,27 @@ model UserFeedback {
   feedbackType   String // correct | wrong | more_like_this | ... (see master prompt)
   feedbackNotes  String?
   createdAt      DateTime @default(now())
+}
+
+model PriorityProfile {
+  id        String   @id @default(cuid())
+  name      String
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  rules SmartRule[]
+}
+
+model SmartRule {
+  id                String          @id @default(cuid())
+  priorityProfileId String
+  priorityProfile   PriorityProfile @relation(fields: [priorityProfileId], references: [id], onDelete: Cascade)
+  ruleText          String // plain-English rule, e.g. "Always prioritize emails from my boss"
+  isActive          Boolean         @default(true)
+  priorityWeight    Int             @default(0)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
 }
 
 model DailyEmailBrief {

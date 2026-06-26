@@ -1,5 +1,6 @@
 import { EmptyState } from "@/components/EmptyState";
 import { SmartInboxDashboard } from "@/components/SmartInboxDashboard";
+import { SmartRulesManager } from "@/components/SmartRulesManager";
 import { loadDashboardData } from "@/lib/dashboard-data";
 import { BUCKET_KEYS } from "@/lib/dashboard-types";
 
@@ -25,7 +26,29 @@ export default async function Home() {
           </p>
         </header>
 
-        <main>{hasEmails ? <SmartInboxDashboard data={data} /> : <EmptyState />}</main>
+        <main>
+          {hasEmails ? (
+            <SmartInboxDashboard data={data} />
+          ) : (
+            <div className="flex flex-col gap-8">
+              <EmptyState />
+              <section aria-labelledby="smart-rules-heading" className="flex flex-col gap-3">
+                <div>
+                  <h2
+                    id="smart-rules-heading"
+                    className="text-lg font-semibold tracking-tight text-[var(--ink-900)]"
+                  >
+                    Smart Rules
+                  </h2>
+                  <p className="mt-0.5 text-sm text-[var(--ink-500)]">
+                    Set up rules now to personalize triage before your first classification.
+                  </p>
+                </div>
+                <SmartRulesManager />
+              </section>
+            </div>
+          )}
+        </main>
       </div>
     </div>
   );

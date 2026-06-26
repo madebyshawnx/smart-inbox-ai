@@ -50,6 +50,11 @@ vi.mock("@/lib/persistence", () => ({
 // Mock the prisma singleton so importing the route does not construct a client.
 vi.mock("@/lib/db", () => ({ prisma: {} }));
 
+// Mock the rules layer so the route does not hit the (empty mock) database.
+vi.mock("@/lib/rules", () => ({
+  loadActiveRuleTexts: vi.fn().mockResolvedValue([]),
+}));
+
 import { GET, POST } from "@/app/api/classify/route";
 
 function postRequest(body: unknown): Request {

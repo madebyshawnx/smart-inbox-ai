@@ -3,6 +3,7 @@ import { createAnthropicClient } from "@/lib/classification/anthropic-client";
 import { classifyEmail, type RawEmail } from "@/lib/classification/classify";
 import { prisma } from "@/lib/db";
 import { saveClassifiedEmail } from "@/lib/persistence";
+import { loadActiveRuleTexts } from "@/lib/rules";
 import { sampleEmails } from "../../../../tests/fixtures/emails";
 
 // The RawEmail fields that must be present, non-empty strings on any
@@ -99,9 +100,15 @@ export async function POST(request: Request): Promise<NextResponse> {
   try {
     const client = createAnthropicClient();
 
+    // The user's trusted priority rules personalize every classification in
+    // this run. Loaded once and passed in their own tagged section.
+    const rules = await loadActiveRuleTexts(prisma);
+
     // Classify all emails in parallel — the LLM round-trips are the slow part,
     // so a batch of N runs in roughly the time of one instead of N in series.
-    const classifications = await Promise.all(emails.map((email) => classifyEmail(email, client)));
+    const classifications = await Promise.all(
+      emails.map((email) => classifyEmail(email, client, { rules })),
+    );
 
     // Persist sequentially: SQLite serializes writes, so concurrent upserts can
     // contend. The writes are fast, so order them rather than risk a lock.
