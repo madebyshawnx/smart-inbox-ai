@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { MODEL_VERSION, type ModelClient } from "./classify";
+import type { ModelClient } from "./classify";
+import { CLASSIFICATION_MODEL } from "./model";
 
 export type AnthropicModelClientOptions = {
   apiKey?: string;
@@ -25,7 +26,7 @@ export class AnthropicModelClient implements ModelClient {
   constructor(opts: AnthropicModelClientOptions = {}) {
     // Passing `apiKey: undefined` is fine — the SDK falls back to ANTHROPIC_API_KEY.
     this.client = new Anthropic({ apiKey: opts.apiKey });
-    this.model = opts.model ?? MODEL_VERSION;
+    this.model = opts.model ?? CLASSIFICATION_MODEL;
     this.maxTokens = opts.maxTokens ?? DEFAULT_MAX_TOKENS;
   }
 
@@ -35,7 +36,18 @@ export class AnthropicModelClient implements ModelClient {
       max_tokens: this.maxTokens,
       // temperature 0 keeps classification as deterministic as the API allows.
       temperature: 0,
-      system: params.system,
+      // The system prompt is large and byte-for-byte identical on every
+      // classification. Marking it ephemeral lets Anthropic prompt caching reuse
+      // it across calls, cutting input-token cost on every request after the
+      // first. It must be a single text block (not a bare string) to carry
+      // cache_control.
+      system: [
+        {
+          type: "text",
+          text: params.system,
+          cache_control: { type: "ephemeral" },
+        },
+      ],
       messages: [{ role: "user", content: params.user }],
     });
 

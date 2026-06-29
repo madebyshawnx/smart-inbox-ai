@@ -99,7 +99,42 @@ export async function getConnectedAccount(
   };
 }
 
+/**
+ * Best-effort revocation of the connected Google grant. Loads the account,
+ * decrypts a token (refresh token preferred — revoking it invalidates the whole
+ * grant; falls back to the access token), and POSTs it to Google's revoke
+ * endpoint so we don't leave a valid grant dangling after disconnect.
+ *
+ * Never throws: a network failure, an already-expired token, or a missing
+ * account must NOT block the local delete that follows. Returns true only when
+ * Google acknowledged the revocation.
+ */
+export async function revokeAccess(db: PrismaClient): Promise<boolean> {
+  try {
+    const account = await findGoogleAccount(db);
+    if (account === null) {
+      return false;
+    }
+
+    const encrypted = account.refreshTokenEncrypted ?? account.accessTokenEncrypted;
+    const token = decrypt(encrypted);
+
+    const response = await fetch("https://oauth2.googleapis.com/revoke", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ token }).toString(),
+    });
+    return response.ok;
+  } catch {
+    // Swallow — revocation is best-effort and must never block disconnect.
+    return false;
+  }
+}
+
 export async function disconnectAccount(db: PrismaClient): Promise<void> {
+  // Try to revoke the grant with Google first, then always delete locally even
+  // if revoke failed (offline / expired token / no account).
+  await revokeAccess(db);
   await db.connectedAccount.deleteMany({ where: { provider: GOOGLE_PROVIDER } });
 }
 
