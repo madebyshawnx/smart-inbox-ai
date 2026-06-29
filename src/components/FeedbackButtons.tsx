@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 
 type FeedbackType =
   | "correct"
@@ -36,12 +37,10 @@ const ACTIONS: ReadonlyArray<{ type: FeedbackType; label: string }> = [
 export function FeedbackButtons({ emailMessageId }: FeedbackButtonsProps) {
   const [status, setStatus] = useState<Status>("idle");
   const [pending, setPending] = useState<FeedbackType | null>(null);
-  const [ruleAdded, setRuleAdded] = useState(false);
 
   async function submit(feedbackType: FeedbackType) {
     setStatus("saving");
     setPending(feedbackType);
-    setRuleAdded(false);
     try {
       const res = await fetch("/api/feedback", {
         method: "POST",
@@ -52,10 +51,14 @@ export function FeedbackButtons({ emailMessageId }: FeedbackButtonsProps) {
         throw new Error(`Request failed (${res.status})`);
       }
       const data = (await res.json()) as { ruleCreated?: boolean };
-      setRuleAdded(data.ruleCreated === true);
       setStatus("saved");
+      toast.success("Feedback saved");
+      if (data.ruleCreated === true) {
+        toast.success("Smart Rule added");
+      }
     } catch {
       setStatus("error");
+      toast.error("Couldn’t save feedback — try again");
     } finally {
       setPending(null);
     }
@@ -77,16 +80,6 @@ export function FeedbackButtons({ emailMessageId }: FeedbackButtonsProps) {
           {pending === action.type ? "…" : action.label}
         </button>
       ))}
-      {status === "saved" && (
-        <span className="text-xs font-medium text-[var(--priority-low)]" role="status">
-          {ruleAdded ? "Saved ✓ — Smart Rule added" : "Saved ✓"}
-        </span>
-      )}
-      {status === "error" && (
-        <span className="text-xs font-medium text-[var(--priority-high)]" role="status">
-          Couldn’t save — try again
-        </span>
-      )}
     </div>
   );
 }

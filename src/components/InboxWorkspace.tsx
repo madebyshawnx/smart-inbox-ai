@@ -8,6 +8,7 @@ import {
   type DashboardData,
   type EmailCard,
 } from "@/lib/dashboard-types";
+import { CommandPalette } from "./CommandPalette";
 import { ConnectGmailCard } from "./ConnectGmailCard";
 import { FeedbackButtons } from "./FeedbackButtons";
 import { resolvePriorityTier, tierStyle } from "./priority-style";
@@ -108,6 +109,7 @@ export function InboxWorkspace({ data }: InboxWorkspaceProps) {
 
   const [selectedId, setSelectedId] = useState<string | null>(() => orderedEmails[0]?.id ?? null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   // On narrow screens the detail pane replaces the list once a row is tapped.
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
 
@@ -129,7 +131,7 @@ export function InboxWorkspace({ data }: InboxWorkspaceProps) {
   // j/k + arrow navigation through the flat ordered list; Enter focuses detail.
   const handleListKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLElement>) => {
-      if (orderedEmails.length === 0) {
+      if (orderedEmails.length === 0 || paletteOpen) {
         return;
       }
       const currentIndex = orderedEmails.findIndex((email) => email.id === selectedEmail?.id);
@@ -150,8 +152,21 @@ export function InboxWorkspace({ data }: InboxWorkspaceProps) {
         detailRef.current?.focus();
       }
     },
-    [orderedEmails, selectedEmail],
+    [orderedEmails, selectedEmail, paletteOpen],
   );
+
+  // Global Cmd/Ctrl+K toggles the command palette. Bound on the window so it
+  // fires regardless of focus, including from inside text inputs.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setPaletteOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   // Settings drawer: Escape closes; focus the close button on open.
   useEffect(() => {
@@ -172,7 +187,11 @@ export function InboxWorkspace({ data }: InboxWorkspaceProps) {
 
   return (
     <div className="flex h-dvh flex-col bg-[var(--surface)] text-[var(--ink-900)]">
-      <TopBar glanceBrief={glanceBrief} onOpenSettings={() => setSettingsOpen(true)} />
+      <TopBar
+        glanceBrief={glanceBrief}
+        onOpenSettings={() => setSettingsOpen(true)}
+        onOpenPalette={() => setPaletteOpen(true)}
+      />
 
       <div className="flex min-h-0 flex-1">
         {/* LIST PANE */}
@@ -233,6 +252,14 @@ export function InboxWorkspace({ data }: InboxWorkspaceProps) {
       {settingsOpen && (
         <SettingsDrawer onClose={() => setSettingsOpen(false)} closeRef={settingsCloseRef} />
       )}
+
+      <CommandPalette
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        emails={orderedEmails}
+        onSelectEmail={selectEmail}
+        onOpenSettings={() => setSettingsOpen(true)}
+      />
     </div>
   );
 }
@@ -240,9 +267,10 @@ export function InboxWorkspace({ data }: InboxWorkspaceProps) {
 type TopBarProps = {
   glanceBrief: string;
   onOpenSettings: () => void;
+  onOpenPalette: () => void;
 };
 
-function TopBar({ glanceBrief, onOpenSettings }: TopBarProps) {
+function TopBar({ glanceBrief, onOpenSettings, onOpenPalette }: TopBarProps) {
   return (
     <header className="flex h-14 shrink-0 items-center gap-4 border-b border-[var(--hairline)] bg-[var(--surface-raised)] px-4 sm:px-6">
       <div className="flex min-w-0 items-center gap-2">
@@ -260,6 +288,15 @@ function TopBar({ glanceBrief, onOpenSettings }: TopBarProps) {
       <p className="min-w-0 flex-1 truncate text-sm text-[var(--ink-500)]">{glanceBrief}</p>
 
       <div className="flex shrink-0 items-center gap-1">
+        <button
+          type="button"
+          onClick={onOpenPalette}
+          aria-label="Open command palette"
+          className="inline-flex items-center gap-1.5 rounded-[var(--radius-chip)] border border-[var(--hairline)] px-2.5 py-1.5 text-xs font-medium text-[var(--ink-500)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+        >
+          <kbd className="font-sans text-[0.7rem] tracking-wide">⌘K</kbd>
+          <span className="hidden sm:inline">Search</span>
+        </button>
         <button
           type="button"
           onClick={onOpenSettings}

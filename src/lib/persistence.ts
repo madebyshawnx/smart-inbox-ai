@@ -110,6 +110,27 @@ export async function saveClassifiedEmail(
   return message.id;
 }
 
+/**
+ * Of the given source ids, return the set that already has a classification.
+ *
+ * Used by sync to skip re-classifying emails it has already processed — the LLM
+ * is the expensive part, so we never re-decide an email we've already triaged
+ * unless the caller explicitly asks for a re-classification.
+ */
+export async function findClassifiedSourceIds(
+  db: PrismaClient,
+  sourceIds: string[],
+): Promise<Set<string>> {
+  if (sourceIds.length === 0) {
+    return new Set();
+  }
+  const rows = await db.emailMessage.findMany({
+    where: { sourceId: { in: sourceIds }, classification: { isNot: null } },
+    select: { sourceId: true },
+  });
+  return new Set(rows.map((row) => row.sourceId));
+}
+
 export type SaveFeedbackInput = {
   emailMessageId: string;
   feedbackType: string;

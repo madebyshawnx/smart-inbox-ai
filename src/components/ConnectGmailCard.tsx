@@ -1,12 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 type GmailStatus = { connected: false } | { connected: true; email: string; connectedAt: string };
 
 type SyncResult = { classified: number; needsReview: number; total: number };
-
-type Banner = { kind: "success"; message: string } | { kind: "error"; message: string } | null;
 
 type LoadState = "loading" | "ready" | "error";
 
@@ -19,23 +18,17 @@ type LoadState = "loading" | "ready" | "error";
 export function ConnectGmailCard() {
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [status, setStatus] = useState<GmailStatus | null>(null);
-  const [banner, setBanner] = useState<Banner>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
-  const [syncMessage, setSyncMessage] = useState<string | null>(null);
-  const [syncError, setSyncError] = useState<string | null>(null);
 
   // Read the one-time OAuth redirect flag, then scrub it from the URL so a
-  // refresh doesn't re-show the banner.
+  // refresh doesn't re-show the toast.
   useEffect(() => {
     const flag = new URLSearchParams(window.location.search).get("gmail");
     if (flag === "connected") {
-      setBanner({ kind: "success", message: "Gmail connected ✓" });
+      toast.success("Gmail connected");
     } else if (flag === "error") {
-      setBanner({
-        kind: "error",
-        message: "Couldn't connect Gmail — please try again.",
-      });
+      toast.error("Couldn’t connect Gmail — please try again.");
     }
     if (flag) {
       window.history.replaceState({}, "", window.location.pathname);
@@ -74,21 +67,19 @@ export function ConnectGmailCard() {
 
   async function syncInbox() {
     setIsSyncing(true);
-    setSyncError(null);
-    setSyncMessage(null);
     try {
       const res = await fetch("/api/emails/sync", { method: "POST" });
       if (!res.ok) {
         throw new Error(`sync failed (${res.status})`);
       }
       const result = (await res.json()) as SyncResult;
-      setSyncMessage(
+      toast.success(
         `Synced ${result.total} email${result.total === 1 ? "" : "s"} — ${result.needsReview} need review`,
       );
       // Reload so the server-rendered dashboard picks up the new emails.
       window.location.reload();
     } catch {
-      setSyncError("Couldn't sync your inbox — please try again.");
+      toast.error("Couldn’t sync your inbox — please try again.");
       setIsSyncing(false);
     }
   }
@@ -104,7 +95,7 @@ export function ConnectGmailCard() {
       }
       window.location.reload();
     } catch {
-      setSyncError("Couldn't disconnect — please try again.");
+      toast.error("Couldn’t disconnect — please try again.");
       setIsDisconnecting(false);
     }
   }
@@ -114,19 +105,6 @@ export function ConnectGmailCard() {
       aria-labelledby="connect-gmail-heading"
       className="rounded-[var(--radius-card)] border border-[var(--hairline)] bg-[var(--surface-raised)] p-5 sm:p-6"
     >
-      {banner && (
-        <div
-          role="status"
-          className={`mb-4 flex items-center gap-2 rounded-[var(--radius-chip)] px-4 py-2 text-sm font-medium ${
-            banner.kind === "success"
-              ? "bg-[var(--priority-low-soft)] text-[var(--priority-low)]"
-              : "bg-[var(--priority-high-soft)] text-[var(--priority-high)]"
-          }`}
-        >
-          {banner.message}
-        </div>
-      )}
-
       <div className="flex items-start gap-3">
         <span
           aria-hidden="true"
@@ -211,18 +189,6 @@ export function ConnectGmailCard() {
               {isSyncing && (
                 <p className="mt-3 text-sm text-[var(--ink-500)]" role="status">
                   Syncing your inbox… this can take up to a minute.
-                </p>
-              )}
-
-              {syncMessage && !isSyncing && (
-                <p className="mt-3 text-sm font-medium text-[var(--priority-low)]" role="status">
-                  {syncMessage}
-                </p>
-              )}
-
-              {syncError && (
-                <p className="mt-3 text-sm font-medium text-[var(--priority-high)]" role="status">
-                  {syncError}
                 </p>
               )}
             </div>
