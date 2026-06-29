@@ -1,5 +1,11 @@
 import type { NextConfig } from "next";
 
+// Validate environment variables once, at config load (build/boot). Importing
+// this for its side effect makes a missing ANTHROPIC_API_KEY fail fast with a
+// clear message instead of surfacing as a runtime error later. A relative path
+// is used because the `@/` alias is not resolved when Next loads this config.
+import "./src/lib/env";
+
 // Baseline security headers applied to every response. These are the low-risk,
 // high-value ones for an app that handles a user's email; a full CSP is a
 // production follow-up (it needs per-route nonce work with Next).
