@@ -24,6 +24,7 @@ export type GmailMessage = {
   threadId: string;
   snippet?: string;
   internalDate?: string;
+  labelIds?: string[];
   payload?: GmailPart;
 };
 
@@ -149,6 +150,7 @@ export function normalizeGmailMessage(message: GmailMessage): RawEmail {
     subject: subject === "" ? "(no subject)" : subject,
     bodyText: body.slice(0, MAX_BODY_CHARS),
     receivedAt,
+    labels: message.labelIds ?? [],
   };
 }
 

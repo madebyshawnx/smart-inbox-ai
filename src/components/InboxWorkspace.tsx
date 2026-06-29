@@ -13,6 +13,7 @@ import { ConnectGmailCard } from "./ConnectGmailCard";
 import { FeedbackButtons } from "./FeedbackButtons";
 import { resolvePriorityTier, tierStyle } from "./priority-style";
 import { SmartRulesManager } from "./SmartRulesManager";
+import { SuggestedRules } from "./SuggestedRules";
 import { WhyThisMattersPanel } from "./WhyThisMattersPanel";
 
 type InboxWorkspaceProps = {
@@ -548,6 +549,7 @@ function SettingsDrawer({ onClose, closeRef }: SettingsDrawerProps) {
 
         <div className="flex flex-col gap-6 px-5 py-5">
           <ConnectGmailCard />
+          <SuggestedRules />
           <section aria-labelledby="settings-rules-heading" className="flex flex-col gap-3">
             <div>
               <h3

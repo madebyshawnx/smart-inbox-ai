@@ -21,6 +21,10 @@ model EmailMessage {
   subject     String
   bodyText    String
   receivedAt  DateTime
+  // Gmail labelIds (JSON array) captured at sync — UNREAD/STARRED/IMPORTANT/
+  // INBOX etc. The signal behavioral learning reads to infer how the user
+  // handles a sender. Null for sample fixtures.
+  gmailLabels String?
   createdAt   DateTime @default(now())
 
   classification EmailClassification?
@@ -97,6 +101,14 @@ model SmartRule {
   priorityWeight    Int             @default(0)
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
+}
+
+model DismissedSuggestion {
+  id        String   @id @default(cuid())
+  // Stable signature of a suggested rule (so the same suggestion isn't shown
+  // again once the user dismisses it).
+  signature String   @unique
+  createdAt DateTime @default(now())
 }
 
 model DailyEmailBrief {

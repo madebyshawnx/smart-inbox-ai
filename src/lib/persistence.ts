@@ -77,6 +77,8 @@ export async function saveClassifiedEmail(
   result: ClassifyResult,
 ): Promise<string> {
   const receivedAt = new Date(raw.receivedAt);
+  const gmailLabels =
+    raw.labels !== undefined && raw.labels.length > 0 ? JSON.stringify(raw.labels) : null;
 
   const message = await db.emailMessage.upsert({
     where: { sourceId: raw.sourceId },
@@ -88,6 +90,7 @@ export async function saveClassifiedEmail(
       subject: raw.subject,
       bodyText: raw.bodyText,
       receivedAt,
+      gmailLabels,
     },
     update: {
       threadId: raw.threadId ?? null,
@@ -96,6 +99,7 @@ export async function saveClassifiedEmail(
       subject: raw.subject,
       bodyText: raw.bodyText,
       receivedAt,
+      gmailLabels,
     },
   });
 
@@ -170,6 +174,9 @@ export type PersistedMessage = {
   subject: string;
   bodyText: string;
   receivedAt: Date;
+  // Gmail labelIds as a JSON string (e.g. '["UNREAD","STARRED"]'), or null for
+  // sample fixtures. The signal behavioral learning reads.
+  gmailLabels: string | null;
   createdAt: Date;
 };
 

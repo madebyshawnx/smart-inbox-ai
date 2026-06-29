@@ -18,6 +18,7 @@ function makeRow(id: string, bucket: string, importance: number, overrides: Over
     subject: `Subject ${id}`,
     bodyText: "Body",
     receivedAt: new Date("2026-06-25T08:00:00Z"),
+    gmailLabels: null,
     createdAt: new Date("2026-06-25T08:01:00Z"),
     ...overrides,
   };

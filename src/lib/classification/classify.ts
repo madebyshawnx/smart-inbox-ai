@@ -16,6 +16,9 @@ export type RawEmail = {
   subject: string;
   bodyText: string;
   receivedAt: string;
+  // Gmail labelIds (UNREAD/STARRED/IMPORTANT/INBOX/...) when sourced from Gmail.
+  // Carried for behavioral learning; the classifier itself ignores these.
+  labels?: string[];
 };
 
 export type ClassifyResult = {
