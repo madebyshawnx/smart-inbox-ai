@@ -36,7 +36,7 @@ describe("AnthropicModelClient", () => {
     expect(result).toBe('{"a":1}');
   });
 
-  it("passes model, max_tokens, and temperature 0 to the API", async () => {
+  it("passes model, max_tokens, temperature 0, and a cache-controlled system block to the API", async () => {
     createMock.mockResolvedValue({ content: [{ type: "text", text: "ok" }] });
 
     const client = createAnthropicClient({ apiKey: "k", maxTokens: 512 });
@@ -46,9 +46,17 @@ describe("AnthropicModelClient", () => {
       model: MODEL_VERSION,
       max_tokens: 512,
       temperature: 0,
-      system: "S",
+      // System prompt is sent as a single text block carrying cache_control so
+      // Anthropic prompt caching reuses it across classifications.
+      system: [{ type: "text", text: "S", cache_control: { type: "ephemeral" } }],
       messages: [{ role: "user", content: "U" }],
     });
+  });
+
+  it("defaults the model to claude-haiku-4-5 and stamps the same model_version", () => {
+    // The resolved classification model and the stored model_version both derive
+    // from CLASSIFICATION_MODEL, so MODEL_VERSION is the cheaper Haiku default.
+    expect(MODEL_VERSION).toBe("claude-haiku-4-5");
   });
 
   it("ignores non-text content blocks", async () => {

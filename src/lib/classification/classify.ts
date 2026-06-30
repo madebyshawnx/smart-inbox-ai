@@ -1,6 +1,9 @@
+import { CLASSIFICATION_MODEL } from "./model";
 import { type EmailClassification, parseClassification } from "./schema";
 
-export const MODEL_VERSION = "claude-sonnet-4-6";
+// The stored model_version must match the model the request is actually sent
+// to. Both derive from CLASSIFICATION_MODEL so they can never drift.
+export const MODEL_VERSION = CLASSIFICATION_MODEL;
 
 // Below this confidence the model's own answer is not trusted; the email is
 // routed to Needs Review rather than shown in a confident bucket. The master

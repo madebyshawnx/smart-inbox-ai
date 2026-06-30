@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import {
   BUCKET_KEYS,
   BUCKET_LABELS,
@@ -564,8 +565,64 @@ function SettingsDrawer({ onClose, closeRef }: SettingsDrawerProps) {
             </div>
             <SmartRulesManager />
           </section>
+
+          <DangerZone />
         </div>
       </aside>
     </div>
+  );
+}
+
+function DangerZone() {
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDelete = useCallback(async () => {
+    const confirmed = window.confirm(
+      "Delete all your data? This permanently removes every triaged email, rule, " +
+        "and your Gmail connection. This cannot be undone.",
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      const res = await fetch("/api/user/delete-data", { method: "POST" });
+      if (!res.ok) {
+        throw new Error("delete failed");
+      }
+      toast.success("All data deleted");
+      window.location.reload();
+    } catch {
+      toast.error("Could not delete your data. Please try again.");
+      setDeleting(false);
+    }
+  }, []);
+
+  return (
+    <section
+      aria-labelledby="settings-danger-heading"
+      className="flex flex-col gap-3 border-t border-[var(--priority-high-soft)] pt-5"
+    >
+      <div>
+        <h3
+          id="settings-danger-heading"
+          className="text-base font-semibold tracking-tight text-[var(--priority-high)]"
+        >
+          Danger zone
+        </h3>
+        <p className="mt-0.5 text-sm text-[var(--ink-500)]">
+          Permanently delete everything this app has stored about you.
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={handleDelete}
+        disabled={deleting}
+        className="inline-flex w-fit items-center gap-1.5 rounded-[var(--radius-chip)] border border-[var(--priority-high)] px-3.5 py-2 text-sm font-semibold text-[var(--priority-high)] transition-colors hover:bg-[var(--priority-high-soft)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--priority-high)] disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        {deleting ? "Deleting…" : "Delete all my data"}
+      </button>
+    </section>
   );
 }
