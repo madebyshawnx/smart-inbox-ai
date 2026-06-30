@@ -97,3 +97,19 @@ In Google Cloud Console → APIs & Services → Credentials → your OAuth clien
   before opening to real users. See `docs/production-roadmap.md`.
 - **Gmail sync is polling** (manual "Sync"). Push via Pub/Sub webhooks is a later
   optimization.
+
+---
+
+## Background auto-sync (Vercel Cron)
+
+A scheduled job re-syncs the connected Gmail account so the inbox stays fresh
+without anyone clicking "Sync". Config lives in `vercel.json`.
+
+- **Cron path:** `/api/cron/sync` (Vercel Cron calls it with `GET`).
+- **Schedule:** `0 12 * * *` — once daily at noon UTC. The Hobby plan allows
+  **one cron run per day**; upgrade the plan to sync more often.
+- **Secure it:** set `CRON_SECRET` in Vercel (Production env). Vercel then sends
+  `authorization: Bearer <CRON_SECRET>` automatically on every cron invocation,
+  and the endpoint rejects anything else with 401. With no `CRON_SECRET` set the
+  endpoint is open (fine for local/dev). If no inbox is connected the cron
+  returns 200 and quietly skips.

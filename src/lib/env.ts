@@ -23,6 +23,7 @@ export const env = createEnv({
     GOOGLE_REDIRECT_URI: z.string().url().optional(),
     ENCRYPTION_KEY: z.string().optional(),
     SMART_INBOX_DATABASE_URL: z.string().optional(),
+    CRON_SECRET: z.string().optional(),
   },
   runtimeEnv: {
     ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
@@ -31,6 +32,7 @@ export const env = createEnv({
     GOOGLE_REDIRECT_URI: process.env.GOOGLE_REDIRECT_URI,
     ENCRYPTION_KEY: process.env.ENCRYPTION_KEY,
     SMART_INBOX_DATABASE_URL: process.env.SMART_INBOX_DATABASE_URL,
+    CRON_SECRET: process.env.CRON_SECRET,
   },
   // Vitest sets NODE_ENV=test; skipping validation there keeps importing this
   // module (transitively, via next.config or app code) from throwing in tests.
