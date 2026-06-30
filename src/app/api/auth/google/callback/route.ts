@@ -7,8 +7,18 @@ import { saveConnectedAccount } from "@/lib/google/tokens";
 
 const STATE_COOKIE = "google_oauth_state";
 
-function redirectHome(request: Request, status: "connected" | "error"): NextResponse {
-  const res = NextResponse.redirect(new URL(`/?gmail=${status}`, request.url));
+function redirectHome(
+  request: Request,
+  status: "connected" | "error",
+  reason?: string,
+): NextResponse {
+  const url = new URL(`/?gmail=${status}`, request.url);
+  // Surface the real failure reason in the URL so the app can show it on screen
+  // (single-user debug aid) instead of forcing a Vercel-logs dig. Truncated.
+  if (reason) {
+    url.searchParams.set("reason", reason.slice(0, 200));
+  }
+  const res = NextResponse.redirect(url);
   res.cookies.delete(STATE_COOKIE);
   return res;
 }
@@ -30,7 +40,14 @@ export async function GET(request: Request): Promise<NextResponse> {
   const expectedState = cookieStore.get(STATE_COOKIE)?.value;
 
   if (!code || !state || !expectedState || state !== expectedState) {
-    return redirectHome(request, "error");
+    const why = !code
+      ? "no_code_from_google"
+      : !state
+        ? "no_state_from_google"
+        : !expectedState
+          ? "state_cookie_missing_on_return"
+          : "state_mismatch";
+    return redirectHome(request, "error", `oauth_state_check_failed:${why}`);
   }
 
   try {
@@ -52,6 +69,6 @@ export async function GET(request: Request): Promise<NextResponse> {
     // DB write) so a failed connect is diagnosable in Vercel logs instead of
     // silently bouncing back with ?gmail=error.
     console.error("[auth/google/callback] connect failed:", err);
-    return redirectHome(request, "error");
+    return redirectHome(request, "error", err instanceof Error ? err.message : String(err));
   }
 }

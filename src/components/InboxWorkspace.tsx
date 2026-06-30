@@ -209,8 +209,11 @@ export function InboxWorkspace({ data, hasRules = true }: InboxWorkspaceProps) {
   // Vercel Cron; manual Sync (Settings / command palette) stays available.
   useEffect(() => {
     let flag: string | null = null;
+    let reason: string | null = null;
     try {
-      flag = new URLSearchParams(window.location.search).get("gmail");
+      const params = new URLSearchParams(window.location.search);
+      flag = params.get("gmail");
+      reason = params.get("reason");
     } catch {
       flag = null;
     }
@@ -221,7 +224,16 @@ export function InboxWorkspace({ data, hasRules = true }: InboxWorkspaceProps) {
     window.history.replaceState({}, "", window.location.pathname);
 
     if (flag === "error") {
-      toast.error("Couldn’t connect Gmail — please try again.");
+      // Show the actual failure reason on screen (long-lived so it can be read /
+      // screenshotted) instead of a generic message that hides the cause.
+      toast.error(
+        reason
+          ? `Couldn’t connect Gmail — ${reason}`
+          : "Couldn’t connect Gmail — please try again.",
+        {
+          duration: 30000,
+        },
+      );
       return;
     }
     if (flag !== "connected") {
