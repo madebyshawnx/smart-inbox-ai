@@ -19,15 +19,34 @@ type FeedbackButtonsProps = {
 
 type Status = "idle" | "saving" | "saved" | "error";
 
-const ACTIONS: ReadonlyArray<{ type: FeedbackType; label: string }> = [
-  { type: "correct", label: "Correct" },
-  { type: "wrong", label: "Wrong" },
-  { type: "mark_urgent", label: "Mark urgent" },
-  { type: "not_urgent", label: "Not urgent" },
-  { type: "move_to_read_later", label: "Move to Read Later" },
-  { type: "safe_to_ignore", label: "Safe to ignore" },
-  { type: "always_prioritize_sender", label: "Always prioritize this sender" },
-  { type: "usually_ignore_sender", label: "Usually ignore this sender" },
+type FeedbackAction = { type: FeedbackType; label: string };
+
+// Grouped so the row reads as intent ("was this right?" vs. adjustments vs.
+// sender preferences) rather than one flat wall of pills.
+const GROUPS: ReadonlyArray<{ heading: string; actions: ReadonlyArray<FeedbackAction> }> = [
+  {
+    heading: "Was this right?",
+    actions: [
+      { type: "correct", label: "Correct" },
+      { type: "wrong", label: "Wrong" },
+    ],
+  },
+  {
+    heading: "Adjust",
+    actions: [
+      { type: "mark_urgent", label: "Mark urgent" },
+      { type: "not_urgent", label: "Not urgent" },
+      { type: "move_to_read_later", label: "Read Later" },
+      { type: "safe_to_ignore", label: "Safe to ignore" },
+    ],
+  },
+  {
+    heading: "This sender",
+    actions: [
+      { type: "always_prioritize_sender", label: "Always prioritize" },
+      { type: "usually_ignore_sender", label: "Usually ignore" },
+    ],
+  },
 ];
 
 /**
@@ -67,18 +86,25 @@ export function FeedbackButtons({ emailMessageId }: FeedbackButtonsProps) {
   const isSaving = status === "saving";
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      {ACTIONS.map((action) => (
-        <button
-          key={action.type}
-          type="button"
-          disabled={isSaving}
-          onClick={() => submit(action.type)}
-          aria-label={`Feedback: ${action.label}`}
-          className="rounded-full border border-[var(--hairline)] bg-[var(--surface-raised)] px-2.5 py-1 text-xs font-medium text-[var(--ink-700)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {pending === action.type ? "…" : action.label}
-        </button>
+    <div className="flex flex-col gap-2.5">
+      {GROUPS.map((group) => (
+        <div key={group.heading} className="flex flex-wrap items-center gap-1.5">
+          <span className="mr-1 w-full text-[0.65rem] font-semibold tracking-[0.1em] text-[var(--ink-500)] uppercase sm:w-auto">
+            {group.heading}
+          </span>
+          {group.actions.map((action) => (
+            <button
+              key={action.type}
+              type="button"
+              disabled={isSaving}
+              onClick={() => submit(action.type)}
+              aria-label={`Feedback: ${action.label}`}
+              className="rounded-full border border-[var(--hairline)] bg-[var(--surface-raised)] px-2.5 py-1 text-xs font-medium text-[var(--ink-700)] shadow-[var(--shadow-sm)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {pending === action.type ? "…" : action.label}
+            </button>
+          ))}
+        </div>
       ))}
     </div>
   );
