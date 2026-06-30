@@ -369,80 +369,108 @@ function AccountBlock({ collapsed, onOpenSettings }: AccountBlockProps) {
 
   const initials = deriveInitials(status.email);
 
-  return (
-    <div ref={menuRef} className="relative">
-      {menuOpen && (
-        <>
-          {/* Click-away backdrop */}
-          <button
-            type="button"
-            aria-hidden="true"
-            tabIndex={-1}
-            onClick={() => setMenuOpen(false)}
-            className="fixed inset-0 z-40 cursor-default"
-          />
-          <div
-            role="menu"
-            aria-label="Account menu"
-            className="absolute bottom-full left-0 z-50 mb-2 w-52 overflow-hidden rounded-[var(--radius-card)] border border-[var(--hairline)] bg-[var(--surface-raised)] py-1 shadow-[0_16px_40px_-20px_rgba(20,20,40,0.5)]"
-          >
-            <div className="border-b border-[var(--hairline)] px-3 py-2">
-              <p className="truncate text-xs font-medium text-[var(--ink-900)]">{status.email}</p>
-              <p className="text-[0.7rem] text-[var(--ink-500)]">Connected</p>
+  // Collapsed rail: avatar opens a compact popover (space-constrained).
+  if (collapsed) {
+    return (
+      <div ref={menuRef} className="relative">
+        {menuOpen && (
+          <>
+            <button
+              type="button"
+              aria-hidden="true"
+              tabIndex={-1}
+              onClick={() => setMenuOpen(false)}
+              className="fixed inset-0 z-40 cursor-default"
+            />
+            <div
+              role="menu"
+              aria-label="Account menu"
+              className="absolute bottom-full left-0 z-50 mb-2 w-52 overflow-hidden rounded-[var(--radius-card)] border border-[var(--hairline)] bg-[var(--surface-raised)] py-1 shadow-[0_16px_40px_-20px_rgba(20,20,40,0.5)]"
+            >
+              <div className="border-b border-[var(--hairline)] px-3 py-2">
+                <p className="truncate text-xs font-medium text-[var(--ink-900)]">{status.email}</p>
+                <p className="text-[0.7rem] text-[var(--ink-500)]">Connected</p>
+              </div>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={openSettings}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--ink-700)] transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--ink-900)] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--accent)]"
+              >
+                <span aria-hidden="true">⚙</span> Settings
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={disconnect}
+                disabled={isDisconnecting}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--priority-high)] transition-colors hover:bg-[var(--priority-high-soft)] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--priority-high)] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <span aria-hidden="true">⏻</span>
+                {isDisconnecting ? "Signing out…" : "Sign out"}
+              </button>
             </div>
-            <button
-              type="button"
-              role="menuitem"
-              onClick={openSettings}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--ink-700)] transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--ink-900)] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--accent)]"
-            >
-              <span aria-hidden="true">⚙</span> Settings
-            </button>
-            <button
-              type="button"
-              role="menuitem"
-              onClick={disconnect}
-              disabled={isDisconnecting}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--priority-high)] transition-colors hover:bg-[var(--priority-high-soft)] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--priority-high)] disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <span aria-hidden="true">⏻</span>
-              {isDisconnecting ? "Signing out…" : "Sign out (disconnect Gmail)"}
-            </button>
-          </div>
-        </>
-      )}
+          </>
+        )}
+        <button
+          type="button"
+          onClick={() => setMenuOpen((prev) => !prev)}
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
+          aria-label={`Account: ${status.email}`}
+          title={status.email}
+          className={`flex h-10 w-10 items-center justify-center self-center rounded-[var(--radius-chip)] transition-colors hover:bg-[var(--surface)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
+            menuOpen ? "bg-[var(--surface)]" : ""
+          }`}
+        >
+          <span
+            aria-hidden="true"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-xs font-semibold text-white"
+          >
+            {initials}
+          </span>
+        </button>
+      </div>
+    );
+  }
 
-      <button
-        type="button"
-        onClick={() => setMenuOpen((prev) => !prev)}
-        aria-haspopup="menu"
-        aria-expanded={menuOpen}
-        aria-label={`Account: ${status.email}`}
-        title={collapsed ? status.email : undefined}
-        className={`flex items-center rounded-[var(--radius-chip)] transition-colors hover:bg-[var(--surface)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
-          collapsed ? "h-10 w-10 justify-center self-center" : "w-full gap-2.5 px-2 py-2"
-        } ${menuOpen ? "bg-[var(--surface)]" : ""}`}
-      >
+  // Expanded rail: identity + directly-visible Settings / Sign out buttons, so
+  // signing out (= disconnecting Gmail) is never hidden behind a menu.
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center gap-2.5 px-2 pt-1">
         <span
           aria-hidden="true"
           className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-xs font-semibold text-white"
         >
           {initials}
         </span>
-        {!collapsed && (
-          <>
-            <span className="min-w-0 flex-1 text-left">
-              <span className="block truncate text-[0.8rem] font-medium text-[var(--ink-900)]">
-                {status.email}
-              </span>
-              <span className="block text-[0.7rem] text-[var(--ink-500)]">Gmail connected</span>
-            </span>
-            <span aria-hidden="true" className="shrink-0 text-[var(--ink-500)]">
-              ⋯
-            </span>
-          </>
-        )}
-      </button>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[0.8rem] font-medium text-[var(--ink-900)]">
+            {status.email}
+          </span>
+          <span className="block text-[0.7rem] text-[var(--ink-500)]">Gmail connected</span>
+        </span>
+      </div>
+      <div className="flex gap-1">
+        <button
+          type="button"
+          onClick={onOpenSettings}
+          className="flex flex-1 items-center justify-center gap-1.5 rounded-[var(--radius-chip)] border border-[var(--hairline)] px-2 py-1.5 text-xs font-medium text-[var(--ink-700)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+        >
+          <span aria-hidden="true">⚙</span> Settings
+        </button>
+        <button
+          type="button"
+          onClick={disconnect}
+          disabled={isDisconnecting}
+          aria-label="Sign out (disconnect Gmail)"
+          className="flex flex-1 items-center justify-center gap-1.5 rounded-[var(--radius-chip)] border border-[var(--priority-high)] px-2 py-1.5 text-xs font-medium text-[var(--priority-high)] transition-colors hover:bg-[var(--priority-high-soft)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--priority-high)] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <span aria-hidden="true">⏻</span>
+          {isDisconnecting ? "Signing out…" : "Sign out"}
+        </button>
+      </div>
     </div>
   );
 }
