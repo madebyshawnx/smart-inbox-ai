@@ -2,17 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import {
-  BUCKET_KEYS,
-  BUCKET_LABELS,
-  type BucketKey,
-  type DashboardData,
-  type EmailCard,
-} from "@/lib/dashboard-types";
+import type { DashboardData, EmailCard } from "@/lib/dashboard-types";
+import { buildSections, filterBySelectedBucket, type SelectedBucket } from "@/lib/inbox-buckets";
 import { AskInbox } from "./AskInbox";
 import { CommandPalette } from "./CommandPalette";
 import { ConnectGmailCard } from "./ConnectGmailCard";
 import { FeedbackButtons } from "./FeedbackButtons";
+import { LeftRail } from "./LeftRail";
 import { OnboardingQuestionnaire } from "./OnboardingQuestionnaire";
 import { resolvePriorityTier, tierStyle } from "./priority-style";
 import { SmartRulesManager } from "./SmartRulesManager";
@@ -30,35 +26,8 @@ type InboxWorkspaceProps = {
 // localStorage key recording that the user dismissed (Skip / close) the first-run
 // onboarding, so it does not nag on every subsequent visit.
 const ONBOARDING_DISMISSED_KEY = "smart-inbox:onboarding-dismissed";
-
-// Shorter, glanceable labels for the slim list-section headers. Falls back to
-// the canonical BUCKET_LABELS for anything not overridden here.
-const SHORT_LABELS: Partial<Record<BucketKey, string>> = {
-  money_or_account_related: "Money & Accounts",
-};
-
-function sectionLabel(key: BucketKey): string {
-  return SHORT_LABELS[key] ?? BUCKET_LABELS[key];
-}
-
-type ListSection = {
-  key: BucketKey;
-  label: string;
-  emails: ReadonlyArray<EmailCard>;
-};
-
-// Build the ordered, non-empty list sections. Empty buckets are omitted
-// entirely so the list never shows a "None right now" placeholder.
-function buildSections(buckets: DashboardData["buckets"]): ListSection[] {
-  const sections: ListSection[] = [];
-  for (const key of BUCKET_KEYS) {
-    const emails = buckets[key];
-    if (emails.length > 0) {
-      sections.push({ key, label: sectionLabel(key), emails });
-    }
-  }
-  return sections;
-}
+// localStorage key persisting the collapsed state of the left rail.
+const RAIL_COLLAPSED_KEY = "smart-inbox:rail-collapsed";
 
 // Derive a tight, single-line brief sentence from the raw counts — not the long
 // paragraph. e.g. "2 emails · 1 needs attention · 1 to read".
@@ -112,10 +81,26 @@ function formatDeadline(raw: string): string {
 }
 
 export function InboxWorkspace({ data, hasRules = true }: InboxWorkspaceProps) {
+  // All non-empty buckets (drives the rail nav). The list is filtered from these.
   const sections = useMemo(() => buildSections(data.buckets), [data.buckets]);
+  const totalCount = useMemo(
+    () => sections.reduce((sum, section) => sum + section.emails.length, 0),
+    [sections],
+  );
 
-  // Flatten in display order for keyboard navigation + default selection.
-  const orderedEmails = useMemo(() => sections.flatMap((section) => section.emails), [sections]);
+  const [selectedBucket, setSelectedBucket] = useState<SelectedBucket>("all");
+
+  // The sections actually shown in the middle list, narrowed to the selection.
+  const visibleSections = useMemo(
+    () => filterBySelectedBucket(sections, selectedBucket),
+    [sections, selectedBucket],
+  );
+
+  // Flatten the visible sections for keyboard navigation + default selection.
+  const orderedEmails = useMemo(
+    () => visibleSections.flatMap((section) => section.emails),
+    [visibleSections],
+  );
 
   const glanceBrief = useMemo(() => buildGlanceBrief(data.brief), [data.brief]);
 
@@ -124,6 +109,10 @@ export function InboxWorkspace({ data, hasRules = true }: InboxWorkspaceProps) {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [askOpen, setAskOpen] = useState(false);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
+  // Rail collapse (desktop, icon-only strip) — hydrated from localStorage below.
+  const [railCollapsed, setRailCollapsed] = useState(false);
+  // On narrow screens the rail opens as an overlay rather than sitting inline.
+  const [mobileRailOpen, setMobileRailOpen] = useState(false);
   // On narrow screens the detail pane replaces the list once a row is tapped.
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
 
@@ -142,7 +131,39 @@ export function InboxWorkspace({ data, hasRules = true }: InboxWorkspaceProps) {
     setMobileDetailOpen(true);
   }, []);
 
-  // j/k + arrow navigation through the flat ordered list; Enter focuses detail.
+  // Switching buckets resets the list view: clear selection (the memo falls back
+  // to the first email of the new filter) and return to the list on mobile.
+  const selectBucket = useCallback((bucket: SelectedBucket) => {
+    setSelectedBucket(bucket);
+    setSelectedId(null);
+    setMobileRailOpen(false);
+    setMobileDetailOpen(false);
+  }, []);
+
+  // Hydrate + persist the rail collapsed state (client-only; localStorage).
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem(RAIL_COLLAPSED_KEY) === "true") {
+        setRailCollapsed(true);
+      }
+    } catch {
+      // Ignore storage failures — default to expanded.
+    }
+  }, []);
+
+  const toggleRailCollapsed = useCallback(() => {
+    setRailCollapsed((prev) => {
+      const next = !prev;
+      try {
+        window.localStorage.setItem(RAIL_COLLAPSED_KEY, String(next));
+      } catch {
+        // Ignore storage failures — state still applies for this session.
+      }
+      return next;
+    });
+  }, []);
+
+  // j/k + arrow navigation through the flat ordered (filtered) list; Enter focuses detail.
   const handleListKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLElement>) => {
       if (orderedEmails.length === 0 || paletteOpen) {
@@ -233,24 +254,67 @@ export function InboxWorkspace({ data, hasRules = true }: InboxWorkspaceProps) {
     <div className="flex h-dvh flex-col bg-[var(--surface)] text-[var(--ink-900)]">
       <TopBar
         glanceBrief={glanceBrief}
-        onOpenSettings={() => setSettingsOpen(true)}
         onOpenPalette={() => setPaletteOpen(true)}
-        onOpenAsk={() => setAskOpen(true)}
+        onOpenMobileRail={() => setMobileRailOpen(true)}
       />
 
       <div className="flex min-h-0 flex-1">
+        {/* LEFT RAIL — inline on md+ */}
+        <div className="hidden md:flex">
+          <LeftRail
+            sections={sections}
+            selectedBucket={selectedBucket}
+            onSelectBucket={selectBucket}
+            totalCount={totalCount}
+            collapsed={railCollapsed}
+            onToggleCollapse={toggleRailCollapsed}
+            onOpenAsk={() => setAskOpen(true)}
+            onOpenSettings={() => setSettingsOpen(true)}
+          />
+        </div>
+
+        {/* LEFT RAIL — overlay on < md */}
+        {mobileRailOpen && (
+          <div className="fixed inset-0 z-50 flex md:hidden">
+            <button
+              type="button"
+              aria-label="Close navigation"
+              onClick={() => setMobileRailOpen(false)}
+              className="absolute inset-0 bg-[oklch(20%_0.02_260_/_0.35)]"
+            />
+            <div className="relative h-full">
+              <LeftRail
+                sections={sections}
+                selectedBucket={selectedBucket}
+                onSelectBucket={selectBucket}
+                totalCount={totalCount}
+                collapsed={false}
+                onToggleCollapse={() => setMobileRailOpen(false)}
+                onOpenAsk={() => {
+                  setMobileRailOpen(false);
+                  setAskOpen(true);
+                }}
+                onOpenSettings={() => {
+                  setMobileRailOpen(false);
+                  setSettingsOpen(true);
+                }}
+              />
+            </div>
+          </div>
+        )}
+
         {/* LIST PANE */}
         <aside
           aria-label="Triaged emails"
           onKeyDown={handleListKeyDown}
           className={`${
             mobileDetailOpen ? "hidden" : "flex"
-          } w-full shrink-0 flex-col border-r border-[var(--hairline)] md:flex md:w-[380px] lg:w-[400px]`}
+          } w-full shrink-0 flex-col border-r border-[var(--hairline)] md:flex md:w-[360px] lg:w-[400px]`}
         >
           <div className="min-h-0 flex-1 overflow-y-auto">
             {hasEmails ? (
               <ul className="flex flex-col py-2">
-                {sections.map((section) => (
+                {visibleSections.map((section) => (
                   <li key={section.key}>
                     <SectionHeader label={section.label} count={section.emails.length} />
                     <ul>
@@ -320,57 +384,36 @@ export function InboxWorkspace({ data, hasRules = true }: InboxWorkspaceProps) {
 
 type TopBarProps = {
   glanceBrief: string;
-  onOpenSettings: () => void;
   onOpenPalette: () => void;
-  onOpenAsk: () => void;
+  onOpenMobileRail: () => void;
 };
 
-function TopBar({ glanceBrief, onOpenSettings, onOpenPalette, onOpenAsk }: TopBarProps) {
+function TopBar({ glanceBrief, onOpenPalette, onOpenMobileRail }: TopBarProps) {
   return (
-    <header className="flex h-14 shrink-0 items-center gap-4 border-b border-[var(--hairline)] bg-[var(--surface-raised)] px-4 sm:px-6">
-      <div className="flex min-w-0 items-center gap-2">
-        <span
-          aria-hidden="true"
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[var(--radius-chip)] bg-[var(--accent-soft)] text-sm text-[var(--accent)]"
-        >
-          ✉
+    <header className="flex h-14 shrink-0 items-center gap-3 border-b border-[var(--hairline)] bg-[var(--surface-raised)] px-3 sm:px-4">
+      {/* Mobile-only: open the rail overlay. */}
+      <button
+        type="button"
+        onClick={onOpenMobileRail}
+        aria-label="Open navigation"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-chip)] text-[var(--ink-700)] transition-colors hover:bg-[var(--surface)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] md:hidden"
+      >
+        <span aria-hidden="true" className="text-base leading-none">
+          ☰
         </span>
-        <span className="hidden text-sm font-semibold tracking-tight text-[var(--ink-900)] sm:inline">
-          Smart Inbox AI
-        </span>
-      </div>
+      </button>
 
       <p className="min-w-0 flex-1 truncate text-sm text-[var(--ink-500)]">{glanceBrief}</p>
 
-      <div className="flex shrink-0 items-center gap-1">
-        <button
-          type="button"
-          onClick={onOpenAsk}
-          aria-label="Ask your inbox"
-          className="inline-flex items-center gap-1.5 rounded-[var(--radius-chip)] border border-[var(--hairline)] px-3 py-1.5 text-xs font-medium text-[var(--ink-700)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
-        >
-          <span aria-hidden="true">✨</span>
-          <span className="hidden sm:inline">Ask</span>
-        </button>
-        <button
-          type="button"
-          onClick={onOpenPalette}
-          aria-label="Open command palette"
-          className="inline-flex items-center gap-1.5 rounded-[var(--radius-chip)] border border-[var(--hairline)] px-2.5 py-1.5 text-xs font-medium text-[var(--ink-500)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
-        >
-          <kbd className="font-sans text-[0.7rem] tracking-wide">⌘K</kbd>
-          <span className="hidden sm:inline">Search</span>
-        </button>
-        <button
-          type="button"
-          onClick={onOpenSettings}
-          aria-label="Open settings"
-          className="inline-flex items-center gap-1.5 rounded-[var(--radius-chip)] border border-[var(--hairline)] px-3 py-1.5 text-xs font-medium text-[var(--ink-700)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
-        >
-          <span aria-hidden="true">⚙</span>
-          <span className="hidden sm:inline">Settings</span>
-        </button>
-      </div>
+      <button
+        type="button"
+        onClick={onOpenPalette}
+        aria-label="Open command palette"
+        className="inline-flex shrink-0 items-center gap-1.5 rounded-[var(--radius-chip)] border border-[var(--hairline)] px-2.5 py-1.5 text-xs font-medium text-[var(--ink-500)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+      >
+        <kbd className="font-sans text-[0.7rem] tracking-wide">⌘K</kbd>
+        <span className="hidden sm:inline">Search</span>
+      </button>
     </header>
   );
 }
