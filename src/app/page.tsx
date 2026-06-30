@@ -1,6 +1,7 @@
 import { InboxWorkspace } from "@/components/InboxWorkspace";
 import { loadDashboardData } from "@/lib/dashboard-data";
 import { prisma } from "@/lib/db";
+import { listRules } from "@/lib/rules";
 
 // The dashboard reflects live database state (emails, rules), so it must be
 // rendered per-request — never prerendered/cached at build time, or a deployed
@@ -8,7 +9,7 @@ import { prisma } from "@/lib/db";
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const data = await loadDashboardData(prisma);
+  const [data, rules] = await Promise.all([loadDashboardData(prisma), listRules(prisma)]);
 
-  return <InboxWorkspace data={data} />;
+  return <InboxWorkspace data={data} hasRules={rules.length > 0} />;
 }

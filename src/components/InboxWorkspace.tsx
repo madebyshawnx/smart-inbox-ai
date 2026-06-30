@@ -13,6 +13,7 @@ import { AskInbox } from "./AskInbox";
 import { CommandPalette } from "./CommandPalette";
 import { ConnectGmailCard } from "./ConnectGmailCard";
 import { FeedbackButtons } from "./FeedbackButtons";
+import { OnboardingQuestionnaire } from "./OnboardingQuestionnaire";
 import { resolvePriorityTier, tierStyle } from "./priority-style";
 import { SmartRulesManager } from "./SmartRulesManager";
 import { SuggestedRules } from "./SuggestedRules";
@@ -20,7 +21,15 @@ import { WhyThisMattersPanel } from "./WhyThisMattersPanel";
 
 type InboxWorkspaceProps = {
   data: DashboardData;
+  // Whether the user already has at least one Smart Rule. Used to decide whether
+  // to auto-open the first-run priority questionnaire. Defaults to true so the
+  // questionnaire never auto-opens unless the page explicitly says there are none.
+  hasRules?: boolean;
 };
+
+// localStorage key recording that the user dismissed (Skip / close) the first-run
+// onboarding, so it does not nag on every subsequent visit.
+const ONBOARDING_DISMISSED_KEY = "smart-inbox:onboarding-dismissed";
 
 // Shorter, glanceable labels for the slim list-section headers. Falls back to
 // the canonical BUCKET_LABELS for anything not overridden here.
@@ -102,7 +111,7 @@ function formatDeadline(raw: string): string {
   });
 }
 
-export function InboxWorkspace({ data }: InboxWorkspaceProps) {
+export function InboxWorkspace({ data, hasRules = true }: InboxWorkspaceProps) {
   const sections = useMemo(() => buildSections(data.buckets), [data.buckets]);
 
   // Flatten in display order for keyboard navigation + default selection.
@@ -114,6 +123,7 @@ export function InboxWorkspace({ data }: InboxWorkspaceProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [askOpen, setAskOpen] = useState(false);
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
   // On narrow screens the detail pane replaces the list once a row is tapped.
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
 
@@ -170,6 +180,36 @@ export function InboxWorkspace({ data }: InboxWorkspaceProps) {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  // First-run: auto-open the priority questionnaire when the user has no rules
+  // yet and hasn't already dismissed it. Runs once on mount (client-only, so
+  // localStorage is available).
+  useEffect(() => {
+    if (hasRules) {
+      return;
+    }
+    let dismissed = false;
+    try {
+      dismissed = window.localStorage.getItem(ONBOARDING_DISMISSED_KEY) === "true";
+    } catch {
+      // localStorage can throw in private modes; treat as not-dismissed.
+      dismissed = false;
+    }
+    if (!dismissed) {
+      setOnboardingOpen(true);
+    }
+  }, [hasRules]);
+
+  // Closing the questionnaire (Skip, scrim, Escape, or after creating rules) marks
+  // it dismissed so it won't auto-open again on the next visit.
+  const closeOnboarding = useCallback(() => {
+    setOnboardingOpen(false);
+    try {
+      window.localStorage.setItem(ONBOARDING_DISMISSED_KEY, "true");
+    } catch {
+      // Ignore storage failures — worst case the prompt reappears next visit.
+    }
   }, []);
 
   // Settings drawer: Escape closes; focus the close button on open.
@@ -255,8 +295,14 @@ export function InboxWorkspace({ data }: InboxWorkspaceProps) {
       </div>
 
       {settingsOpen && (
-        <SettingsDrawer onClose={() => setSettingsOpen(false)} closeRef={settingsCloseRef} />
+        <SettingsDrawer
+          onClose={() => setSettingsOpen(false)}
+          closeRef={settingsCloseRef}
+          onOpenOnboarding={() => setOnboardingOpen(true)}
+        />
       )}
+
+      <OnboardingQuestionnaire open={onboardingOpen} onClose={closeOnboarding} />
 
       <CommandPalette
         open={paletteOpen}
@@ -535,9 +581,10 @@ function EmptyDetail({ brief }: EmptyDetailProps) {
 type SettingsDrawerProps = {
   onClose: () => void;
   closeRef: React.RefObject<HTMLButtonElement | null>;
+  onOpenOnboarding: () => void;
 };
 
-function SettingsDrawer({ onClose, closeRef }: SettingsDrawerProps) {
+function SettingsDrawer({ onClose, closeRef, onOpenOnboarding }: SettingsDrawerProps) {
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       {/* Scrim */}
@@ -579,6 +626,16 @@ function SettingsDrawer({ onClose, closeRef }: SettingsDrawerProps) {
                 Personalize how your inbox is triaged.
               </p>
             </div>
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onOpenOnboarding();
+              }}
+              className="inline-flex w-fit items-center gap-1.5 rounded-[var(--radius-chip)] border border-[var(--hairline)] px-3.5 py-2 text-sm font-semibold text-[var(--ink-700)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+            >
+              <span aria-hidden="true">✨</span> Set up priorities
+            </button>
             <SmartRulesManager />
           </section>
 
