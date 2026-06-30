@@ -14,6 +14,7 @@ import { OnboardingQuestionnaire } from "./OnboardingQuestionnaire";
 import { resolvePriorityTier, tierStyle } from "./priority-style";
 import { SmartRulesManager } from "./SmartRulesManager";
 import { SuggestedRules } from "./SuggestedRules";
+import { Sheet, SheetContent, SheetTitle } from "./ui/sheet";
 import { WhyThisMattersPanel } from "./WhyThisMattersPanel";
 
 type InboxWorkspaceProps = {
@@ -128,7 +129,6 @@ export function InboxWorkspace({ data, hasRules = true }: InboxWorkspaceProps) {
   }, [orderedEmails, selectedId]);
 
   const detailRef = useRef<HTMLElement | null>(null);
-  const settingsCloseRef = useRef<HTMLButtonElement | null>(null);
 
   const selectEmail = useCallback((id: string) => {
     setSelectedId(id);
@@ -290,21 +290,6 @@ export function InboxWorkspace({ data, hasRules = true }: InboxWorkspaceProps) {
     }
   }, []);
 
-  // Settings drawer: Escape closes; focus the close button on open.
-  useEffect(() => {
-    if (!settingsOpen) {
-      return;
-    }
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setSettingsOpen(false);
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    settingsCloseRef.current?.focus();
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [settingsOpen]);
-
   const hasEmails = orderedEmails.length > 0;
 
   return (
@@ -436,13 +421,11 @@ export function InboxWorkspace({ data, hasRules = true }: InboxWorkspaceProps) {
         </main>
       </div>
 
-      {settingsOpen && (
-        <SettingsDrawer
-          onClose={() => setSettingsOpen(false)}
-          closeRef={settingsCloseRef}
-          onOpenOnboarding={() => setOnboardingOpen(true)}
-        />
-      )}
+      <SettingsDrawer
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        onOpenOnboarding={() => setOnboardingOpen(true)}
+      />
 
       <OnboardingQuestionnaire open={onboardingOpen} onClose={closeOnboarding} />
 
@@ -687,36 +670,19 @@ function EmptyDetail({ brief }: EmptyDetailProps) {
 }
 
 type SettingsDrawerProps = {
-  onClose: () => void;
-  closeRef: React.RefObject<HTMLButtonElement | null>;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   onOpenOnboarding: () => void;
 };
 
-function SettingsDrawer({ onClose, closeRef, onOpenOnboarding }: SettingsDrawerProps) {
+function SettingsDrawer({ open, onOpenChange, onOpenOnboarding }: SettingsDrawerProps) {
   return (
-    <div className="fixed inset-0 z-50 flex justify-end">
-      {/* Scrim */}
-      <button
-        type="button"
-        aria-label="Close settings"
-        onClick={onClose}
-        className="absolute inset-0 bg-[oklch(20%_0.02_260_/_0.35)] transition-opacity"
-      />
-      <aside
-        aria-label="Settings"
-        className="relative flex h-full w-full max-w-md flex-col overflow-y-auto border-l border-[var(--hairline)] bg-[var(--surface)] shadow-[-12px_0_40px_-20px_rgba(20,20,40,0.4)]"
-      >
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent aria-describedby={undefined}>
         <header className="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--hairline)] bg-[var(--surface)] px-5 py-4">
-          <h2 className="text-base font-semibold tracking-tight text-[var(--ink-900)]">Settings</h2>
-          <button
-            ref={closeRef}
-            type="button"
-            onClick={onClose}
-            aria-label="Close settings"
-            className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-chip)] text-[var(--ink-500)] transition-colors hover:bg-[var(--surface-raised)] hover:text-[var(--ink-900)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
-          >
-            <X size={16} />
-          </button>
+          <SheetTitle className="text-base font-semibold tracking-tight text-[var(--ink-900)]">
+            Settings
+          </SheetTitle>
         </header>
 
         <div className="flex flex-col gap-6 px-5 py-5">
@@ -737,7 +703,7 @@ function SettingsDrawer({ onClose, closeRef, onOpenOnboarding }: SettingsDrawerP
             <button
               type="button"
               onClick={() => {
-                onClose();
+                onOpenChange(false);
                 onOpenOnboarding();
               }}
               className="inline-flex w-fit items-center gap-1.5 rounded-[var(--radius-chip)] border border-[var(--hairline)] px-3.5 py-2 text-sm font-semibold text-[var(--ink-700)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
@@ -749,8 +715,8 @@ function SettingsDrawer({ onClose, closeRef, onOpenOnboarding }: SettingsDrawerP
 
           <DangerZone />
         </div>
-      </aside>
-    </div>
+      </SheetContent>
+    </Sheet>
   );
 }
 
