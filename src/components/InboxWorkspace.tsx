@@ -9,6 +9,7 @@ import {
   type DashboardData,
   type EmailCard,
 } from "@/lib/dashboard-types";
+import { AskInbox } from "./AskInbox";
 import { CommandPalette } from "./CommandPalette";
 import { ConnectGmailCard } from "./ConnectGmailCard";
 import { FeedbackButtons } from "./FeedbackButtons";
@@ -112,6 +113,7 @@ export function InboxWorkspace({ data }: InboxWorkspaceProps) {
   const [selectedId, setSelectedId] = useState<string | null>(() => orderedEmails[0]?.id ?? null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [askOpen, setAskOpen] = useState(false);
   // On narrow screens the detail pane replaces the list once a row is tapped.
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
 
@@ -193,6 +195,7 @@ export function InboxWorkspace({ data }: InboxWorkspaceProps) {
         glanceBrief={glanceBrief}
         onOpenSettings={() => setSettingsOpen(true)}
         onOpenPalette={() => setPaletteOpen(true)}
+        onOpenAsk={() => setAskOpen(true)}
       />
 
       <div className="flex min-h-0 flex-1">
@@ -261,7 +264,10 @@ export function InboxWorkspace({ data }: InboxWorkspaceProps) {
         emails={orderedEmails}
         onSelectEmail={selectEmail}
         onOpenSettings={() => setSettingsOpen(true)}
+        onOpenAsk={() => setAskOpen(true)}
       />
+
+      <AskInbox open={askOpen} onClose={() => setAskOpen(false)} />
     </div>
   );
 }
@@ -270,9 +276,10 @@ type TopBarProps = {
   glanceBrief: string;
   onOpenSettings: () => void;
   onOpenPalette: () => void;
+  onOpenAsk: () => void;
 };
 
-function TopBar({ glanceBrief, onOpenSettings, onOpenPalette }: TopBarProps) {
+function TopBar({ glanceBrief, onOpenSettings, onOpenPalette, onOpenAsk }: TopBarProps) {
   return (
     <header className="flex h-14 shrink-0 items-center gap-4 border-b border-[var(--hairline)] bg-[var(--surface-raised)] px-4 sm:px-6">
       <div className="flex min-w-0 items-center gap-2">
@@ -290,6 +297,15 @@ function TopBar({ glanceBrief, onOpenSettings, onOpenPalette }: TopBarProps) {
       <p className="min-w-0 flex-1 truncate text-sm text-[var(--ink-500)]">{glanceBrief}</p>
 
       <div className="flex shrink-0 items-center gap-1">
+        <button
+          type="button"
+          onClick={onOpenAsk}
+          aria-label="Ask your inbox"
+          className="inline-flex items-center gap-1.5 rounded-[var(--radius-chip)] border border-[var(--hairline)] px-3 py-1.5 text-xs font-medium text-[var(--ink-700)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+        >
+          <span aria-hidden="true">✨</span>
+          <span className="hidden sm:inline">Ask</span>
+        </button>
         <button
           type="button"
           onClick={onOpenPalette}

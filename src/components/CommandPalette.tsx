@@ -13,6 +13,7 @@ type CommandPaletteProps = {
   emails: ReadonlyArray<EmailCard>;
   onSelectEmail: (id: string) => void;
   onOpenSettings: () => void;
+  onOpenAsk: () => void;
 };
 
 /**
@@ -26,6 +27,7 @@ export function CommandPalette({
   emails,
   onSelectEmail,
   onOpenSettings,
+  onOpenAsk,
 }: CommandPaletteProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -55,6 +57,11 @@ export function CommandPalette({
   function openSettings() {
     onClose();
     onOpenSettings();
+  }
+
+  function openAsk() {
+    onClose();
+    onOpenAsk();
   }
 
   async function syncInbox() {
@@ -118,6 +125,9 @@ export function CommandPalette({
             heading="Actions"
             className="[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-[0.7rem] [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:tracking-[0.12em] [&_[cmdk-group-heading]]:text-[var(--ink-500)] [&_[cmdk-group-heading]]:uppercase"
           >
+            <PaletteItem value="Ask your inbox" icon="✨" onSelect={openAsk}>
+              Ask your inbox
+            </PaletteItem>
             <PaletteItem value="Open Settings" icon="⚙" onSelect={openSettings}>
               Open Settings
             </PaletteItem>
