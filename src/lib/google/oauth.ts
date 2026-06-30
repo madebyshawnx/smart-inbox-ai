@@ -11,9 +11,12 @@ const PROVIDER = "google";
 export { PROVIDER as GOOGLE_PROVIDER };
 
 export function createOAuthClient(): OAuth2Client {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const redirectUri = process.env.GOOGLE_REDIRECT_URI;
+  // Trim to defend against a stray trailing newline/space in the env value
+  // (e.g. pasted into a hosting dashboard) — an untrimmed redirect URI causes
+  // Google redirect_uri_mismatch.
+  const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
+  const redirectUri = process.env.GOOGLE_REDIRECT_URI?.trim();
   if (!clientId || !clientSecret || !redirectUri) {
     throw new Error("Google OAuth env vars (GOOGLE_CLIENT_ID/SECRET/REDIRECT_URI) are not set");
   }
