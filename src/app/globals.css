@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
 /* Smart Inbox AI — Phase 1 dashboard design tokens.
    Light theme, intentional restrained palette. Plain :root only
