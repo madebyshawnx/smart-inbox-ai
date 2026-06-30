@@ -115,6 +115,9 @@ export function InboxWorkspace({ data, hasRules = true }: InboxWorkspaceProps) {
   const [mobileRailOpen, setMobileRailOpen] = useState(false);
   // On narrow screens the detail pane replaces the list once a row is tapped.
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
+  // When a Gmail connect fails, the callback returns the real reason; we pin it
+  // in a persistent banner (toasts are too easy to miss) until dismissed.
+  const [connectError, setConnectError] = useState<string | null>(null);
 
   const selectedEmail = useMemo(() => {
     if (selectedId === null) {
@@ -224,8 +227,8 @@ export function InboxWorkspace({ data, hasRules = true }: InboxWorkspaceProps) {
     window.history.replaceState({}, "", window.location.pathname);
 
     if (flag === "error") {
-      // Show the actual failure reason on screen (long-lived so it can be read /
-      // screenshotted) instead of a generic message that hides the cause.
+      // Pin the failure reason in a persistent banner (toasts are easy to miss).
+      setConnectError(reason ?? "unknown (no reason returned)");
       toast.error(
         reason
           ? `Couldn’t connect Gmail — ${reason}`
@@ -305,6 +308,26 @@ export function InboxWorkspace({ data, hasRules = true }: InboxWorkspaceProps) {
 
   return (
     <div className="flex h-dvh flex-col bg-[var(--surface)] text-[var(--ink-900)]">
+      {connectError && (
+        <div
+          role="alert"
+          className="flex items-start gap-3 border-b border-[var(--priority-high)] bg-[var(--priority-high-soft)] px-4 py-3 text-sm text-[var(--priority-high)]"
+        >
+          <span aria-hidden="true">⚠</span>
+          <span className="min-w-0 flex-1">
+            <strong className="font-semibold">Gmail connect failed.</strong>{" "}
+            <span className="break-words">{connectError}</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => setConnectError(null)}
+            aria-label="Dismiss error"
+            className="shrink-0 rounded px-1.5 font-semibold hover:bg-[var(--priority-high)]/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--priority-high)]"
+          >
+            ✕
+          </button>
+        </div>
+      )}
       <TopBar glanceBrief={glanceBrief} onOpenMobileRail={() => setMobileRailOpen(true)} />
 
       <div className="flex min-h-0 flex-1">
