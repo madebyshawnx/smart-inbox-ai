@@ -203,6 +203,47 @@ export function InboxWorkspace({ data, hasRules = true }: InboxWorkspaceProps) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
+  // Auto-sync once right after Gmail connects. Returning from OAuth lands on
+  // `/?gmail=connected`; the user shouldn't have to click Sync to see their
+  // first triaged inbox. Periodic refresh after that is handled by the daily
+  // Vercel Cron; manual Sync (Settings / command palette) stays available.
+  useEffect(() => {
+    let flag: string | null = null;
+    try {
+      flag = new URLSearchParams(window.location.search).get("gmail");
+    } catch {
+      flag = null;
+    }
+    if (!flag) {
+      return;
+    }
+    // Scrub the flag immediately so a refresh doesn't re-trigger the sync.
+    window.history.replaceState({}, "", window.location.pathname);
+
+    if (flag === "error") {
+      toast.error("Couldn’t connect Gmail — please try again.");
+      return;
+    }
+    if (flag !== "connected") {
+      return;
+    }
+
+    toast.success("Gmail connected — syncing your inbox…");
+    fetch("/api/emails/sync", { method: "POST" })
+      .then(async (res) => {
+        if (!res.ok) {
+          throw new Error(`sync failed (${res.status})`);
+        }
+        const result = (await res.json()) as { total?: number };
+        const total = result.total ?? 0;
+        toast.success(`Synced ${total} email${total === 1 ? "" : "s"}`);
+        window.location.reload();
+      })
+      .catch(() => {
+        toast.error("Connected, but the first sync failed. Try Sync in Settings.");
+      });
+  }, []);
+
   // First-run: auto-open the priority questionnaire when the user has no rules
   // yet and hasn't already dismissed it. Runs once on mount (client-only, so
   // localStorage is available).

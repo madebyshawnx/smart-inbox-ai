@@ -21,19 +21,9 @@ export function ConnectGmailCard() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
 
-  // Read the one-time OAuth redirect flag, then scrub it from the URL so a
-  // refresh doesn't re-show the toast.
-  useEffect(() => {
-    const flag = new URLSearchParams(window.location.search).get("gmail");
-    if (flag === "connected") {
-      toast.success("Gmail connected");
-    } else if (flag === "error") {
-      toast.error("Couldn’t connect Gmail — please try again.");
-    }
-    if (flag) {
-      window.history.replaceState({}, "", window.location.pathname);
-    }
-  }, []);
+  // Note: the post-OAuth `?gmail=connected|error` flag is handled centrally in
+  // InboxWorkspace (which also auto-syncs on connect), so this card no longer
+  // reads it — doing so here too would double-toast and race the flag scrub.
 
   useEffect(() => {
     let active = true;
