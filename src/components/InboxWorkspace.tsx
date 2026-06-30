@@ -1,6 +1,7 @@
 "use client";
 
 import { AlertTriangle, ArrowLeft, CheckCircle2, Menu, Sparkles, X } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { DashboardData, EmailCard } from "@/lib/dashboard-types";
@@ -413,11 +414,22 @@ export function InboxWorkspace({ data, hasRules = true }: InboxWorkspaceProps) {
             mobileDetailOpen ? "flex" : "hidden"
           } min-w-0 flex-1 flex-col overflow-y-auto outline-none md:flex`}
         >
-          {selectedEmail ? (
-            <EmailDetail email={selectedEmail} onBack={() => setMobileDetailOpen(false)} />
-          ) : (
-            <EmptyDetail brief={data.brief} />
-          )}
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={selectedEmail?.id ?? "empty"}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.16, ease: "easeOut" }}
+              className="flex min-h-0 flex-1 flex-col"
+            >
+              {selectedEmail ? (
+                <EmailDetail email={selectedEmail} onBack={() => setMobileDetailOpen(false)} />
+              ) : (
+                <EmptyDetail brief={data.brief} />
+              )}
+            </motion.div>
+          </AnimatePresence>
         </main>
       </div>
 
