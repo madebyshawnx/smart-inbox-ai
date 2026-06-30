@@ -71,6 +71,18 @@ describe("emailClassificationSchema", () => {
     });
     expect(result.success).toBe(false);
   });
+
+  it("accepts a non-canonical sender email (real Gmail From headers are not always RFC emails)", () => {
+    // Regression: a strict .email() here used to fail the whole classification
+    // and dump otherwise-fine Gmail into Needs Review (CRITICAL-1).
+    for (const email of ["HR Compliance Team", "no-reply", "list@", ""]) {
+      const result = emailClassificationSchema.safeParse({
+        ...validPayload,
+        sender: { name: "Sender", email },
+      });
+      expect(result.success).toBe(true);
+    }
+  });
 });
 
 describe("parseClassification", () => {

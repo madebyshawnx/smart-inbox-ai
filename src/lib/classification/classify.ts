@@ -65,7 +65,7 @@ Respond with ONE JSON object and nothing else — no prose, no markdown fences. 
   "recommended_next_step": string,
   "why_this_matters": string,
   "risk_if_ignored": string | null,
-  "suggested_bucket": "daily_brief" | "needs_attention" | "follow_up_today" | "waiting_on_reply" | "deadlines" | "money_or_account_related" | "read_later" | "low_priority" | "safe_to_ignore" | "needs_review",
+  "suggested_bucket": "needs_attention" | "follow_up_today" | "waiting_on_reply" | "deadlines" | "money_or_account_related" | "read_later" | "low_priority" | "safe_to_ignore" | "needs_review",
   "safe_to_ignore": boolean,
   "model_version": string
 }

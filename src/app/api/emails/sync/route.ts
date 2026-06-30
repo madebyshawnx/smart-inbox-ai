@@ -43,7 +43,11 @@ export async function POST(request: Request): Promise<NextResponse> {
   try {
     const counts = await runSync(prisma, { reclassify });
     return NextResponse.json(counts);
-  } catch {
+  } catch (err) {
+    // Log the real cause server-side (Vercel logs) — the client still gets a
+    // generic message, but a swallowed 500 with no log makes a failed sync
+    // impossible to diagnose in production.
+    console.error("[emails/sync] runSync failed:", err);
     return NextResponse.json({ error: "Could not sync Gmail. Please try again." }, { status: 500 });
   }
 }

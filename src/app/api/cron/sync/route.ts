@@ -38,7 +38,8 @@ export async function GET(request: Request): Promise<NextResponse> {
   try {
     const counts = await runSync(prisma);
     return NextResponse.json({ ok: true, ...counts });
-  } catch {
+  } catch (err) {
+    console.error("[cron/sync] runSync failed:", err);
     return NextResponse.json({ error: "Sync failed" }, { status: 500 });
   }
 }

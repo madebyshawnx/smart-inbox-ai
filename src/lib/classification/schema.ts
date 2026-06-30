@@ -2,7 +2,11 @@ import { z } from "zod";
 
 const senderSchema = z.object({
   name: z.string(),
-  email: z.string().email(),
+  // Display-only. NOT validated as a strict RFC email: real Gmail `From:`
+  // headers are frequently display-name-only, group addresses, or otherwise
+  // non-canonical, and a strict `.email()` here would fail the WHOLE
+  // classification and dump an otherwise-fine email into Needs Review.
+  email: z.string(),
 });
 
 export const emailClassificationSchema = z.object({

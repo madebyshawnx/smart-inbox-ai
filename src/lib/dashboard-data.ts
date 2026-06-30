@@ -13,6 +13,13 @@ import {
 // BucketKey, falling back to "needs_review" if an unexpected value ever lands in
 // the column (fail toward human review, never toward hiding the email).
 function toBucketKey(value: string): BucketKey {
+  // The model is allowed to answer "daily_brief", but that is the top-of-inbox
+  // digest (computed separately by aggregateBrief), NOT a real column. Route
+  // those informational emails to Read Later instead of silently burying them
+  // in Needs Review via the unknown-value fallback below.
+  if (value === "daily_brief") {
+    return "read_later";
+  }
   return (BUCKET_KEYS as readonly string[]).includes(value) ? (value as BucketKey) : "needs_review";
 }
 

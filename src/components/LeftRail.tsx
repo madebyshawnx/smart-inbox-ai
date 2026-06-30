@@ -13,6 +13,7 @@ type LeftRailProps = {
   collapsed: boolean;
   onToggleCollapse: () => void;
   onOpenAsk: () => void;
+  onOpenSearch: () => void;
   onOpenSettings: () => void;
 };
 
@@ -30,6 +31,7 @@ export function LeftRail({
   collapsed,
   onToggleCollapse,
   onOpenAsk,
+  onOpenSearch,
   onOpenSettings,
 }: LeftRailProps) {
   return (
@@ -74,6 +76,7 @@ export function LeftRail({
       {/* Scrollable nav body */}
       <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-2 py-3">
         <AskButton collapsed={collapsed} onOpenAsk={onOpenAsk} />
+        <SearchButton collapsed={collapsed} onOpenSearch={onOpenSearch} />
 
         <div className="my-2 h-px bg-[var(--hairline)]" aria-hidden="true" />
 
@@ -130,6 +133,33 @@ function AskButton({ collapsed, onOpenAsk }: AskButtonProps) {
     >
       <span aria-hidden="true">✨</span>
       {!collapsed && <span>Ask your inbox</span>}
+    </button>
+  );
+}
+
+type SearchButtonProps = {
+  collapsed: boolean;
+  onOpenSearch: () => void;
+};
+
+function SearchButton({ collapsed, onOpenSearch }: SearchButtonProps) {
+  return (
+    <button
+      type="button"
+      onClick={onOpenSearch}
+      aria-label="Search emails and actions"
+      title={collapsed ? "Search (⌘K)" : undefined}
+      className={`flex items-center rounded-[var(--radius-chip)] text-sm font-medium text-[var(--ink-500)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--ink-900)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
+        collapsed ? "h-9 w-9 justify-center self-center" : "w-full gap-2 px-3 py-2"
+      }`}
+    >
+      <span aria-hidden="true">🔍</span>
+      {!collapsed && (
+        <>
+          <span className="flex-1 text-left">Search</span>
+          <kbd className="font-sans text-[0.7rem] tracking-wide text-[var(--ink-500)]">⌘K</kbd>
+        </>
+      )}
     </button>
   );
 }
@@ -376,7 +406,7 @@ function AccountBlock({ collapsed, onOpenSettings }: AccountBlockProps) {
               className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--priority-high)] transition-colors hover:bg-[var(--priority-high-soft)] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--priority-high)] disabled:cursor-not-allowed disabled:opacity-60"
             >
               <span aria-hidden="true">⏻</span>
-              {isDisconnecting ? "Disconnecting…" : "Disconnect Gmail"}
+              {isDisconnecting ? "Signing out…" : "Sign out (disconnect Gmail)"}
             </button>
           </div>
         </>

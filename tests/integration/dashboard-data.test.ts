@@ -113,6 +113,17 @@ describe("loadDashboardData", () => {
     expect(data.brief.needsReviewCount).toBe(1);
   });
 
+  it("routes a daily_brief bucket to read_later instead of burying it in needs_review", async () => {
+    // Regression (CRITICAL-2): daily_brief is a model-allowed value but not a
+    // real column; it must land in a visible bucket, not Needs Review.
+    const db = mockPrismaReturning([makeRow("d", "daily_brief", 30)]);
+
+    const data = await loadDashboardData(db);
+
+    expect(data.buckets.read_later).toHaveLength(1);
+    expect(data.buckets.needs_review).toHaveLength(0);
+  });
+
   it("returns all empty buckets and a zero brief when there are no emails", async () => {
     const db = mockPrismaReturning([]);
 

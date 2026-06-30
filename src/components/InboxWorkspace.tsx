@@ -252,11 +252,7 @@ export function InboxWorkspace({ data, hasRules = true }: InboxWorkspaceProps) {
 
   return (
     <div className="flex h-dvh flex-col bg-[var(--surface)] text-[var(--ink-900)]">
-      <TopBar
-        glanceBrief={glanceBrief}
-        onOpenPalette={() => setPaletteOpen(true)}
-        onOpenMobileRail={() => setMobileRailOpen(true)}
-      />
+      <TopBar glanceBrief={glanceBrief} onOpenMobileRail={() => setMobileRailOpen(true)} />
 
       <div className="flex min-h-0 flex-1">
         {/* LEFT RAIL — inline on md+ */}
@@ -269,6 +265,7 @@ export function InboxWorkspace({ data, hasRules = true }: InboxWorkspaceProps) {
             collapsed={railCollapsed}
             onToggleCollapse={toggleRailCollapsed}
             onOpenAsk={() => setAskOpen(true)}
+            onOpenSearch={() => setPaletteOpen(true)}
             onOpenSettings={() => setSettingsOpen(true)}
           />
         </div>
@@ -293,6 +290,10 @@ export function InboxWorkspace({ data, hasRules = true }: InboxWorkspaceProps) {
                 onOpenAsk={() => {
                   setMobileRailOpen(false);
                   setAskOpen(true);
+                }}
+                onOpenSearch={() => {
+                  setMobileRailOpen(false);
+                  setPaletteOpen(true);
                 }}
                 onOpenSettings={() => {
                   setMobileRailOpen(false);
@@ -384,14 +385,13 @@ export function InboxWorkspace({ data, hasRules = true }: InboxWorkspaceProps) {
 
 type TopBarProps = {
   glanceBrief: string;
-  onOpenPalette: () => void;
   onOpenMobileRail: () => void;
 };
 
-function TopBar({ glanceBrief, onOpenPalette, onOpenMobileRail }: TopBarProps) {
+function TopBar({ glanceBrief, onOpenMobileRail }: TopBarProps) {
   return (
     <header className="flex h-14 shrink-0 items-center gap-3 border-b border-[var(--hairline)] bg-[var(--surface-raised)] px-3 sm:px-4">
-      {/* Mobile-only: open the rail overlay. */}
+      {/* Mobile-only: open the rail overlay (Search lives in the rail now). */}
       <button
         type="button"
         onClick={onOpenMobileRail}
@@ -404,16 +404,6 @@ function TopBar({ glanceBrief, onOpenPalette, onOpenMobileRail }: TopBarProps) {
       </button>
 
       <p className="min-w-0 flex-1 truncate text-sm text-[var(--ink-500)]">{glanceBrief}</p>
-
-      <button
-        type="button"
-        onClick={onOpenPalette}
-        aria-label="Open command palette"
-        className="inline-flex shrink-0 items-center gap-1.5 rounded-[var(--radius-chip)] border border-[var(--hairline)] px-2.5 py-1.5 text-xs font-medium text-[var(--ink-500)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
-      >
-        <kbd className="font-sans text-[0.7rem] tracking-wide">⌘K</kbd>
-        <span className="hidden sm:inline">Search</span>
-      </button>
     </header>
   );
 }

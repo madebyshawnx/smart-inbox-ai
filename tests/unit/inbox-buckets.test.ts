@@ -1,17 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
+  BUCKET_KEYS,
+  type BucketKey,
+  type DashboardData,
+  type EmailCard,
+} from "../../src/lib/dashboard-types";
+import {
   bucketTier,
   buildSections,
   filterBySelectedBucket,
   type ListSection,
   sectionLabel,
 } from "../../src/lib/inbox-buckets";
-import {
-  BUCKET_KEYS,
-  type BucketKey,
-  type DashboardData,
-  type EmailCard,
-} from "../../src/lib/dashboard-types";
 
 function makeEmail(id: string, bucket: BucketKey): EmailCard {
   return {
