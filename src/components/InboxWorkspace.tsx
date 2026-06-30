@@ -606,14 +606,14 @@ function EmailDetail({ email, onBack }: EmailDetailProps) {
       </div>
 
       <dl className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
-        <div className="rounded-lg bg-[var(--surface-raised)] px-3 py-2.5">
+        <div className="rounded-[var(--radius-md)] border border-[var(--hairline)] bg-[var(--surface-raised)] px-3.5 py-3 shadow-[var(--shadow-sm)]">
           <dt className="text-[0.7rem] font-semibold tracking-wide text-[var(--ink-500)] uppercase">
             Suggested next step
           </dt>
           <dd className="mt-0.5 text-[var(--ink-700)]">{email.recommendedNextStep}</dd>
         </div>
         {email.detectedDeadline !== null && (
-          <div className="rounded-lg bg-[var(--surface-raised)] px-3 py-2.5">
+          <div className="rounded-[var(--radius-md)] border border-[var(--hairline)] bg-[var(--surface-raised)] px-3.5 py-3 shadow-[var(--shadow-sm)]">
             <dt className="text-[0.7rem] font-semibold tracking-wide text-[var(--ink-500)] uppercase">
               Deadline
             </dt>
