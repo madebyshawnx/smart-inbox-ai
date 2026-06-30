@@ -47,7 +47,11 @@ export async function GET(request: Request): Promise<NextResponse> {
     });
 
     return redirectHome(request, "connected");
-  } catch {
+  } catch (err) {
+    // Log the real cause (token exchange / profile fetch / token encryption /
+    // DB write) so a failed connect is diagnosable in Vercel logs instead of
+    // silently bouncing back with ?gmail=error.
+    console.error("[auth/google/callback] connect failed:", err);
     return redirectHome(request, "error");
   }
 }
