@@ -1,5 +1,6 @@
 "use client";
 
+import { Check } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -56,6 +57,9 @@ const GROUPS: ReadonlyArray<{ heading: string; actions: ReadonlyArray<FeedbackAc
 export function FeedbackButtons({ emailMessageId }: FeedbackButtonsProps) {
   const [status, setStatus] = useState<Status>("idle");
   const [pending, setPending] = useState<FeedbackType | null>(null);
+  // Feedback types already submitted for this email — their buttons lock into a
+  // confirmed state so the same correction can't be sent twice.
+  const [submitted, setSubmitted] = useState<ReadonlySet<FeedbackType>>(() => new Set());
 
   async function submit(feedbackType: FeedbackType) {
     setStatus("saving");
@@ -71,6 +75,7 @@ export function FeedbackButtons({ emailMessageId }: FeedbackButtonsProps) {
       }
       const data = (await res.json()) as { ruleCreated?: boolean };
       setStatus("saved");
+      setSubmitted((prev) => new Set(prev).add(feedbackType));
       toast.success("Feedback saved");
       if (data.ruleCreated === true) {
         toast.success("Smart Rule added");
@@ -92,18 +97,27 @@ export function FeedbackButtons({ emailMessageId }: FeedbackButtonsProps) {
           <span className="mr-1 w-full text-[0.65rem] font-semibold tracking-[0.1em] text-[var(--ink-500)] uppercase sm:w-auto">
             {group.heading}
           </span>
-          {group.actions.map((action) => (
-            <button
-              key={action.type}
-              type="button"
-              disabled={isSaving}
-              onClick={() => submit(action.type)}
-              aria-label={`Feedback: ${action.label}`}
-              className="rounded-full border border-[var(--hairline)] bg-[var(--surface-raised)] px-2.5 py-1 text-xs font-medium text-[var(--ink-700)] shadow-[var(--shadow-sm)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {pending === action.type ? "…" : action.label}
-            </button>
-          ))}
+          {group.actions.map((action) => {
+            const isDone = submitted.has(action.type);
+            return (
+              <button
+                key={action.type}
+                type="button"
+                disabled={isSaving || isDone}
+                onClick={() => submit(action.type)}
+                aria-label={`Feedback: ${action.label}`}
+                aria-pressed={isDone}
+                className={
+                  isDone
+                    ? "inline-flex items-center gap-1 rounded-full border border-[var(--accent)] bg-[var(--accent-soft)] px-2.5 py-1 text-xs font-medium text-[var(--accent)]"
+                    : "rounded-full border border-[var(--hairline)] bg-[var(--surface-raised)] px-2.5 py-1 text-xs font-medium text-[var(--ink-700)] shadow-[var(--shadow-sm)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-50"
+                }
+              >
+                {isDone && <Check size={12} />}
+                {pending === action.type ? "…" : action.label}
+              </button>
+            );
+          })}
         </div>
       ))}
     </div>

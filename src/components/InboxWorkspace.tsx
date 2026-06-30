@@ -31,6 +31,11 @@ type InboxWorkspaceProps = {
 const ONBOARDING_DISMISSED_KEY = "smart-inbox:onboarding-dismissed";
 // localStorage key persisting the collapsed state of the left rail.
 const RAIL_COLLAPSED_KEY = "smart-inbox:rail-collapsed";
+// localStorage key + bounds for the user-draggable list-pane width (px).
+const LIST_WIDTH_KEY = "smart-inbox:list-width";
+const LIST_WIDTH_MIN = 300;
+const LIST_WIDTH_MAX = 640;
+const LIST_WIDTH_DEFAULT = 380;
 
 // Derive a tight, single-line brief sentence from the raw counts — not the long
 // paragraph. e.g. "2 emails · 1 needs attention · 1 to read".
@@ -121,6 +126,10 @@ export function InboxWorkspace({ data, hasRules = true }: InboxWorkspaceProps) {
   // When a Gmail connect fails, the callback returns the real reason; we pin it
   // in a persistent banner (toasts are too easy to miss) until dismissed.
   const [connectError, setConnectError] = useState<string | null>(null);
+  // User-draggable width of the middle list pane (desktop). Ref mirrors state so
+  // the pointer-move handler reads the latest without re-binding listeners.
+  const [listWidth, setListWidth] = useState(LIST_WIDTH_DEFAULT);
+  const listWidthRef = useRef(LIST_WIDTH_DEFAULT);
 
   const selectedEmail = useMemo(() => {
     if (selectedId === null) {
@@ -154,6 +163,47 @@ export function InboxWorkspace({ data, hasRules = true }: InboxWorkspaceProps) {
     } catch {
       // Ignore storage failures — default to expanded.
     }
+  }, []);
+
+  // Hydrate the saved list width once on mount.
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(LIST_WIDTH_KEY);
+      const n = raw === null ? Number.NaN : Number(raw);
+      if (Number.isFinite(n)) {
+        const clamped = Math.min(Math.max(n, LIST_WIDTH_MIN), LIST_WIDTH_MAX);
+        setListWidth(clamped);
+        listWidthRef.current = clamped;
+      }
+    } catch {
+      // Ignore storage failures — default width applies.
+    }
+  }, []);
+
+  // Drag the divider between the list and detail to resize the list pane.
+  const startListResize = useCallback((event: React.PointerEvent) => {
+    event.preventDefault();
+    const onMove = (moveEvent: PointerEvent) => {
+      const next = Math.min(
+        Math.max(listWidthRef.current + moveEvent.movementX, LIST_WIDTH_MIN),
+        LIST_WIDTH_MAX,
+      );
+      listWidthRef.current = next;
+      setListWidth(next);
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      document.body.style.removeProperty("cursor");
+      try {
+        window.localStorage.setItem(LIST_WIDTH_KEY, String(listWidthRef.current));
+      } catch {
+        // Ignore storage failures — width still applies for this session.
+      }
+    };
+    document.body.style.cursor = "col-resize";
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
   }, []);
 
   const toggleRailCollapsed = useCallback(() => {
@@ -367,13 +417,14 @@ export function InboxWorkspace({ data, hasRules = true }: InboxWorkspaceProps) {
           </div>
         )}
 
-        {/* LIST PANE */}
+        {/* LIST PANE — width is user-draggable on desktop via the handle below. */}
         <aside
           aria-label="Triaged emails"
           onKeyDown={handleListKeyDown}
+          style={{ "--list-w": `${listWidth}px` } as React.CSSProperties}
           className={`${
             mobileDetailOpen ? "hidden" : "flex"
-          } w-full shrink-0 flex-col border-r border-[var(--hairline)] md:flex md:w-[360px] lg:w-[400px]`}
+          } w-full shrink-0 flex-col md:flex md:w-[var(--list-w)]`}
         >
           <div className="min-h-0 flex-1 overflow-y-auto">
             {hasEmails ? (
@@ -404,6 +455,19 @@ export function InboxWorkspace({ data, hasRules = true }: InboxWorkspaceProps) {
             )}
           </div>
         </aside>
+
+        {/* Drag handle — resize the list pane (desktop only). */}
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize inbox list"
+          onPointerDown={startListResize}
+          className={`${
+            mobileDetailOpen ? "hidden" : "hidden md:block"
+          } group relative w-1 shrink-0 cursor-col-resize touch-none bg-[var(--hairline)] transition-colors hover:bg-[var(--accent)]`}
+        >
+          <span className="absolute inset-y-0 -left-1 -right-1" aria-hidden="true" />
+        </div>
 
         {/* DETAIL PANE */}
         <main
