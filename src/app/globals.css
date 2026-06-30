@@ -4,31 +4,47 @@
    Light theme, intentional restrained palette. Plain :root only
    (no @theme block — Biome 2 cannot parse it). */
 :root {
-  --ink-900: oklch(22% 0.02 260);
-  --ink-700: oklch(38% 0.02 260);
-  --ink-500: oklch(55% 0.015 260);
-  --surface: oklch(99% 0.004 260);
+  --ink-900: oklch(24% 0.025 264);
+  --ink-700: oklch(40% 0.022 264);
+  --ink-500: oklch(56% 0.018 264);
+  /* App background is a faint cool tint; raised panels are pure white so the
+     list/detail read as elevated surfaces against the rail. */
+  --surface: oklch(98% 0.005 264);
   --surface-raised: oklch(100% 0 0);
-  --hairline: oklch(91% 0.006 260);
+  /* The rail sits a touch deeper than the content for quiet depth. */
+  --surface-sunken: oklch(97% 0.006 264);
+  --hairline: oklch(92% 0.006 264);
+  --hairline-strong: oklch(88% 0.008 264);
 
-  --accent: oklch(52% 0.16 264);
-  --accent-soft: oklch(95% 0.03 264);
+  --accent: oklch(54% 0.17 262);
+  --accent-hover: oklch(48% 0.18 262);
+  --accent-soft: oklch(96% 0.025 262);
 
   --priority-high: oklch(56% 0.19 25);
   --priority-high-soft: oklch(96% 0.03 25);
-  --priority-medium: oklch(62% 0.15 65);
+  --priority-medium: oklch(64% 0.14 70);
   --priority-medium-soft: oklch(96% 0.04 75);
-  --priority-low: oklch(58% 0.12 160);
-  --priority-low-soft: oklch(96% 0.03 160);
-  --priority-ignore: oklch(60% 0.01 260);
-  --priority-ignore-soft: oklch(96% 0.004 260);
+  --priority-low: oklch(58% 0.12 162);
+  --priority-low-soft: oklch(96% 0.03 162);
+  --priority-ignore: oklch(62% 0.01 264);
+  --priority-ignore-soft: oklch(96% 0.004 264);
 
+  --radius-sm: 8px;
+  --radius-md: 12px;
   --radius-card: 16px;
   --radius-chip: 999px;
+
+  /* Layered elevation — soft, cool-tinted shadows for real depth without
+     looking heavy. */
+  --shadow-sm: 0 1px 2px oklch(24% 0.03 264 / 0.05), 0 1px 1px oklch(24% 0.03 264 / 0.03);
+  --shadow-md: 0 4px 14px -3px oklch(24% 0.03 264 / 0.1), 0 2px 6px -2px oklch(24% 0.03 264 / 0.06);
+  --shadow-lg: 0 18px 44px -14px oklch(24% 0.03 264 / 0.2);
 }
 
 body {
   background: var(--surface);
   color: var(--ink-900);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }

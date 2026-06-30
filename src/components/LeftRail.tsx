@@ -1,5 +1,16 @@
 "use client";
 
+import {
+  Inbox,
+  LogOut,
+  Mail,
+  PanelLeft,
+  PanelLeftClose,
+  Search,
+  Settings,
+  Sparkles,
+} from "lucide-react";
+import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { bucketTier, type ListSection, type SelectedBucket } from "@/lib/inbox-buckets";
@@ -37,7 +48,7 @@ export function LeftRail({
   return (
     <nav
       aria-label="Inbox navigation"
-      className={`flex h-full shrink-0 flex-col border-r border-[var(--hairline)] bg-[var(--surface-raised)] transition-[width] duration-200 ease-out ${
+      className={`flex h-full shrink-0 flex-col border-r border-[var(--hairline)] bg-[var(--surface-sunken)] transition-[width] duration-200 ease-out ${
         collapsed ? "w-[68px]" : "w-[248px]"
       }`}
     >
@@ -51,9 +62,9 @@ export function LeftRail({
           <span className="flex min-w-0 items-center gap-2 pl-1">
             <span
               aria-hidden="true"
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[var(--radius-chip)] bg-[var(--accent-soft)] text-sm text-[var(--accent)]"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[var(--accent)] text-white shadow-[var(--shadow-sm)]"
             >
-              ✉
+              <Mail size={15} strokeWidth={2.25} />
             </span>
             <span className="truncate text-sm font-semibold tracking-tight text-[var(--ink-900)]">
               Smart Inbox
@@ -67,9 +78,7 @@ export function LeftRail({
           aria-expanded={!collapsed}
           className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-chip)] text-[var(--ink-500)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--ink-900)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
         >
-          <span aria-hidden="true" className="text-base leading-none">
-            {collapsed ? "»" : "☰"}
-          </span>
+          {collapsed ? <PanelLeft size={17} /> : <PanelLeftClose size={17} />}
         </button>
       </div>
 
@@ -87,7 +96,7 @@ export function LeftRail({
           dotColor="var(--accent)"
           active={selectedBucket === "all"}
           collapsed={collapsed}
-          icon="◎"
+          icon={<Inbox size={16} />}
           onSelect={() => onSelectBucket("all")}
         />
 
@@ -131,7 +140,7 @@ function AskButton({ collapsed, onOpenAsk }: AskButtonProps) {
         collapsed ? "h-9 w-9 justify-center self-center" : "w-full gap-2 px-3 py-2"
       }`}
     >
-      <span aria-hidden="true">✨</span>
+      <Sparkles size={16} />
       {!collapsed && <span>Ask your inbox</span>}
     </button>
   );
@@ -153,7 +162,7 @@ function SearchButton({ collapsed, onOpenSearch }: SearchButtonProps) {
         collapsed ? "h-9 w-9 justify-center self-center" : "w-full gap-2 px-3 py-2"
       }`}
     >
-      <span aria-hidden="true">🔍</span>
+      <Search size={16} />
       {!collapsed && (
         <>
           <span className="flex-1 text-left">Search</span>
@@ -171,7 +180,7 @@ type BucketItemProps = {
   dotColor: string;
   active: boolean;
   collapsed: boolean;
-  icon?: string;
+  icon?: ReactNode;
   onSelect: () => void;
 };
 
@@ -361,7 +370,7 @@ function AccountBlock({ collapsed, onOpenSettings }: AccountBlockProps) {
             : "w-full justify-center gap-2 px-3 py-2.5 text-sm"
         }`}
       >
-        <span aria-hidden="true">✉</span>
+        <Mail size={16} />
         {!collapsed && <span>Connect Gmail</span>}
       </button>
     );
@@ -397,7 +406,7 @@ function AccountBlock({ collapsed, onOpenSettings }: AccountBlockProps) {
                 onClick={openSettings}
                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--ink-700)] transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--ink-900)] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--accent)]"
               >
-                <span aria-hidden="true">⚙</span> Settings
+                <Settings size={15} /> Settings
               </button>
               <button
                 type="button"
@@ -406,7 +415,7 @@ function AccountBlock({ collapsed, onOpenSettings }: AccountBlockProps) {
                 disabled={isDisconnecting}
                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--priority-high)] transition-colors hover:bg-[var(--priority-high-soft)] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--priority-high)] disabled:cursor-not-allowed disabled:opacity-60"
               >
-                <span aria-hidden="true">⏻</span>
+                <LogOut size={15} />
                 {isDisconnecting ? "Signing out…" : "Sign out"}
               </button>
             </div>
@@ -458,7 +467,7 @@ function AccountBlock({ collapsed, onOpenSettings }: AccountBlockProps) {
           onClick={onOpenSettings}
           className="flex flex-1 items-center justify-center gap-1.5 rounded-[var(--radius-chip)] border border-[var(--hairline)] px-2 py-1.5 text-xs font-medium text-[var(--ink-700)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
         >
-          <span aria-hidden="true">⚙</span> Settings
+          <Settings size={15} /> Settings
         </button>
         <button
           type="button"
@@ -467,7 +476,7 @@ function AccountBlock({ collapsed, onOpenSettings }: AccountBlockProps) {
           aria-label="Sign out (disconnect Gmail)"
           className="flex flex-1 items-center justify-center gap-1.5 rounded-[var(--radius-chip)] border border-[var(--priority-high)] px-2 py-1.5 text-xs font-medium text-[var(--priority-high)] transition-colors hover:bg-[var(--priority-high-soft)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--priority-high)] disabled:cursor-not-allowed disabled:opacity-60"
         >
-          <span aria-hidden="true">⏻</span>
+          <LogOut size={15} />
           {isDisconnecting ? "Signing out…" : "Sign out"}
         </button>
       </div>

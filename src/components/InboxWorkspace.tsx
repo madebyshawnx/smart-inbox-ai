@@ -1,5 +1,6 @@
 "use client";
 
+import { AlertTriangle, ArrowLeft, CheckCircle2, Menu, Sparkles, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { DashboardData, EmailCard } from "@/lib/dashboard-types";
@@ -313,7 +314,7 @@ export function InboxWorkspace({ data, hasRules = true }: InboxWorkspaceProps) {
           role="alert"
           className="flex items-start gap-3 border-b border-[var(--priority-high)] bg-[var(--priority-high-soft)] px-4 py-3 text-sm text-[var(--priority-high)]"
         >
-          <span aria-hidden="true">⚠</span>
+          <AlertTriangle size={16} className="mt-0.5 shrink-0" />
           <span className="min-w-0 flex-1">
             <strong className="font-semibold">Gmail connect failed.</strong>{" "}
             <span className="break-words">{connectError}</span>
@@ -322,9 +323,9 @@ export function InboxWorkspace({ data, hasRules = true }: InboxWorkspaceProps) {
             type="button"
             onClick={() => setConnectError(null)}
             aria-label="Dismiss error"
-            className="shrink-0 rounded px-1.5 font-semibold hover:bg-[var(--priority-high)]/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--priority-high)]"
+            className="flex shrink-0 items-center rounded px-1 py-0.5 hover:bg-[var(--priority-high)]/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--priority-high)]"
           >
-            ✕
+            <X size={15} />
           </button>
         </div>
       )}
@@ -474,9 +475,7 @@ function TopBar({ glanceBrief, onOpenMobileRail }: TopBarProps) {
         aria-label="Open navigation"
         className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-chip)] text-[var(--ink-700)] transition-colors hover:bg-[var(--surface)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] md:hidden"
       >
-        <span aria-hidden="true" className="text-base leading-none">
-          ☰
-        </span>
+        <Menu size={18} />
       </button>
 
       <p className="min-w-0 flex-1 truncate text-sm text-[var(--ink-500)]">{glanceBrief}</p>
@@ -573,7 +572,7 @@ function EmailDetail({ email, onBack }: EmailDetailProps) {
         onClick={onBack}
         className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-[var(--ink-500)] transition-colors hover:text-[var(--ink-900)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] md:hidden"
       >
-        <span aria-hidden="true">←</span> Back to inbox
+        <ArrowLeft size={15} /> Back to inbox
       </button>
 
       <header className="flex flex-wrap items-start justify-between gap-3">
@@ -666,9 +665,9 @@ function EmptyDetail({ brief }: EmptyDetailProps) {
     <div className="flex h-full flex-col items-center justify-center px-6 py-12 text-center">
       <span
         aria-hidden="true"
-        className="flex h-14 w-14 items-center justify-center rounded-[var(--radius-chip)] bg-[var(--accent-soft)] text-2xl text-[var(--accent)]"
+        className="flex h-14 w-14 items-center justify-center rounded-[var(--radius-md)] bg-[var(--accent-soft)] text-[var(--accent)]"
       >
-        ✓
+        <CheckCircle2 size={26} />
       </span>
       <h1 className="mt-4 text-lg font-semibold tracking-tight text-[var(--ink-900)]">
         {reviewedSomething ? "You're all caught up" : "Nothing to triage yet"}
@@ -716,7 +715,7 @@ function SettingsDrawer({ onClose, closeRef, onOpenOnboarding }: SettingsDrawerP
             aria-label="Close settings"
             className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-chip)] text-[var(--ink-500)] transition-colors hover:bg-[var(--surface-raised)] hover:text-[var(--ink-900)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
           >
-            <span aria-hidden="true">✕</span>
+            <X size={16} />
           </button>
         </header>
 
@@ -743,7 +742,7 @@ function SettingsDrawer({ onClose, closeRef, onOpenOnboarding }: SettingsDrawerP
               }}
               className="inline-flex w-fit items-center gap-1.5 rounded-[var(--radius-chip)] border border-[var(--hairline)] px-3.5 py-2 text-sm font-semibold text-[var(--ink-700)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
             >
-              <span aria-hidden="true">✨</span> Set up priorities
+              <Sparkles size={15} /> Set up priorities
             </button>
             <SmartRulesManager />
           </section>
