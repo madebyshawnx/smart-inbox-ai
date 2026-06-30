@@ -11,10 +11,19 @@ import {
   Sparkles,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { bucketTier, type ListSection, type SelectedBucket } from "@/lib/inbox-buckets";
 import { tierStyle } from "./priority-style";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 
 type LeftRailProps = {
   sections: ReadonlyArray<ListSection>;
@@ -196,27 +205,32 @@ function BucketItem({
 }: BucketItemProps) {
   if (collapsed) {
     return (
-      <button
-        type="button"
-        onClick={onSelect}
-        aria-current={active ? "true" : undefined}
-        aria-label={`${label} (${count})`}
-        title={`${label} · ${count}`}
-        className={`relative flex h-9 w-9 items-center justify-center self-center rounded-[var(--radius-chip)] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
-          active ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--surface)]"
-        }`}
-      >
-        <span
-          aria-hidden="true"
-          className="h-2.5 w-2.5 rounded-full"
-          style={{ backgroundColor: dotColor }}
-        />
-        {count > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 min-w-[16px] rounded-full bg-[var(--ink-900)] px-1 text-center text-[0.6rem] font-semibold leading-[16px] text-[var(--surface)]">
-            {count > 99 ? "99+" : count}
-          </span>
-        )}
-      </button>
+      <TooltipProvider delayDuration={300}>
+        <Tooltip>
+          <TooltipTrigger
+            onClick={onSelect}
+            aria-current={active ? "true" : undefined}
+            aria-label={`${label} (${count})`}
+            className={`relative flex h-9 w-9 items-center justify-center self-center rounded-[var(--radius-chip)] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
+              active ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--surface)]"
+            }`}
+          >
+            <span
+              aria-hidden="true"
+              className="h-2.5 w-2.5 rounded-full"
+              style={{ backgroundColor: dotColor }}
+            />
+            {count > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 min-w-[16px] rounded-full bg-[var(--ink-900)] px-1 text-center text-[0.6rem] font-semibold leading-[16px] text-[var(--surface)]">
+                {count > 99 ? "99+" : count}
+              </span>
+            )}
+          </TooltipTrigger>
+          <TooltipContent side="right">
+            {label} · {count}
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
     );
   }
 
@@ -283,9 +297,7 @@ type AccountBlockProps = {
  */
 function AccountBlock({ collapsed, onOpenSettings }: AccountBlockProps) {
   const [status, setStatus] = useState<GmailStatus | null>(null);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
-  const menuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -306,20 +318,6 @@ function AccountBlock({ collapsed, onOpenSettings }: AccountBlockProps) {
     };
   }, []);
 
-  // Escape closes the menu.
-  useEffect(() => {
-    if (!menuOpen) {
-      return;
-    }
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setMenuOpen(false);
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [menuOpen]);
-
   async function disconnect() {
     setIsDisconnecting(true);
     try {
@@ -331,13 +329,7 @@ function AccountBlock({ collapsed, onOpenSettings }: AccountBlockProps) {
     } catch {
       toast.error("Couldn’t disconnect — please try again.");
       setIsDisconnecting(false);
-      setMenuOpen(false);
     }
-  }
-
-  function openSettings() {
-    setMenuOpen(false);
-    onOpenSettings();
   }
 
   // Loading: a quiet placeholder so layout doesn't jump.
@@ -378,59 +370,14 @@ function AccountBlock({ collapsed, onOpenSettings }: AccountBlockProps) {
 
   const initials = deriveInitials(status.email);
 
-  // Collapsed rail: avatar opens a compact popover (space-constrained).
+  // Collapsed rail: avatar opens a Radix DropdownMenu (keyboard, focus, and
+  // dismissal handled by the primitive — no hand-rolled popover state).
   if (collapsed) {
     return (
-      <div ref={menuRef} className="relative">
-        {menuOpen && (
-          <>
-            <button
-              type="button"
-              aria-hidden="true"
-              tabIndex={-1}
-              onClick={() => setMenuOpen(false)}
-              className="fixed inset-0 z-40 cursor-default"
-            />
-            <div
-              role="menu"
-              aria-label="Account menu"
-              className="absolute bottom-full left-0 z-50 mb-2 w-52 overflow-hidden rounded-[var(--radius-card)] border border-[var(--hairline)] bg-[var(--surface-raised)] py-1 shadow-[0_16px_40px_-20px_rgba(20,20,40,0.5)]"
-            >
-              <div className="border-b border-[var(--hairline)] px-3 py-2">
-                <p className="truncate text-xs font-medium text-[var(--ink-900)]">{status.email}</p>
-                <p className="text-[0.7rem] text-[var(--ink-500)]">Connected</p>
-              </div>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={openSettings}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--ink-700)] transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--ink-900)] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--accent)]"
-              >
-                <Settings size={15} /> Settings
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={disconnect}
-                disabled={isDisconnecting}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--priority-high)] transition-colors hover:bg-[var(--priority-high-soft)] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--priority-high)] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <LogOut size={15} />
-                {isDisconnecting ? "Signing out…" : "Sign out"}
-              </button>
-            </div>
-          </>
-        )}
-        <button
-          type="button"
-          onClick={() => setMenuOpen((prev) => !prev)}
-          aria-haspopup="menu"
-          aria-expanded={menuOpen}
+      <DropdownMenu>
+        <DropdownMenuTrigger
           aria-label={`Account: ${status.email}`}
-          title={status.email}
-          className={`flex h-10 w-10 items-center justify-center self-center rounded-[var(--radius-chip)] transition-colors hover:bg-[var(--surface)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
-            menuOpen ? "bg-[var(--surface)]" : ""
-          }`}
+          className="flex h-10 w-10 items-center justify-center self-center rounded-[var(--radius-chip)] transition-colors hover:bg-[var(--surface)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] data-[state=open]:bg-[var(--surface)]"
         >
           <span
             aria-hidden="true"
@@ -438,8 +385,31 @@ function AccountBlock({ collapsed, onOpenSettings }: AccountBlockProps) {
           >
             {initials}
           </span>
-        </button>
-      </div>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent side="right" align="end">
+          <DropdownMenuLabel>
+            <span className="block truncate text-xs font-medium text-[var(--ink-900)]">
+              {status.email}
+            </span>
+            <span className="block text-[0.7rem] text-[var(--ink-500)]">Gmail connected</span>
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={onOpenSettings}>
+            <Settings size={15} /> Settings
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onSelect={(event) => {
+              event.preventDefault();
+              disconnect();
+            }}
+            disabled={isDisconnecting}
+            className="text-[var(--priority-high)] data-[highlighted]:bg-[var(--priority-high-soft)] data-[highlighted]:text-[var(--priority-high)]"
+          >
+            <LogOut size={15} />
+            {isDisconnecting ? "Signing out…" : "Sign out"}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     );
   }
 
