@@ -15,6 +15,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { DashboardData, EmailCard } from "@/lib/dashboard-types";
 import { buildSections, filterBySelectedBucket, type SelectedBucket } from "@/lib/inbox-buckets";
+import { ActionButtons } from "./ActionButtons";
 import { AskInbox } from "./AskInbox";
 import { CommandPalette } from "./CommandPalette";
 import { ConnectGmailCard } from "./ConnectGmailCard";
@@ -99,8 +100,44 @@ function formatDeadline(raw: string): string {
 }
 
 export function InboxWorkspace({ data, hasRules = true }: InboxWorkspaceProps) {
+  // Emails optimistically removed from the list (archived). Kept client-side only
+  // this wave — no schema change — so undo simply drops the id back out of the set
+  // and the server-rendered data reappears. A hard reload also clears it.
+  const [archivedIds, setArchivedIds] = useState<ReadonlySet<string>>(() => new Set());
+
+  const archiveEmail = useCallback((id: string) => {
+    setArchivedIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  }, []);
+
+  const restoreEmail = useCallback((id: string) => {
+    setArchivedIds((prev) => {
+      if (!prev.has(id)) {
+        return prev;
+      }
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  }, []);
+
+  // Buckets with optimistically-archived emails filtered out.
+  const liveBuckets = useMemo(() => {
+    if (archivedIds.size === 0) {
+      return data.buckets;
+    }
+    const entries = Object.entries(data.buckets).map(([key, emails]) => [
+      key,
+      emails.filter((email) => !archivedIds.has(email.id)),
+    ]);
+    return Object.fromEntries(entries) as DashboardData["buckets"];
+  }, [data.buckets, archivedIds]);
+
   // All non-empty buckets (drives the rail nav). The list is filtered from these.
-  const sections = useMemo(() => buildSections(data.buckets), [data.buckets]);
+  const sections = useMemo(() => buildSections(liveBuckets), [liveBuckets]);
   const totalCount = useMemo(
     () => sections.reduce((sum, section) => sum + section.emails.length, 0),
     [sections],
@@ -533,7 +570,12 @@ export function InboxWorkspace({ data, hasRules = true }: InboxWorkspaceProps) {
               className="flex min-h-0 flex-1 flex-col"
             >
               {selectedEmail ? (
-                <EmailDetail email={selectedEmail} onBack={() => setMobileDetailOpen(false)} />
+                <EmailDetail
+                  email={selectedEmail}
+                  onBack={() => setMobileDetailOpen(false)}
+                  onArchived={archiveEmail}
+                  onRestore={restoreEmail}
+                />
               ) : (
                 <EmptyDetail brief={data.brief} />
               )}
@@ -667,9 +709,12 @@ function EmailRow({ email, isSelected, onSelect }: EmailRowProps) {
 type EmailDetailProps = {
   email: EmailCard;
   onBack: () => void;
+  // Optimistically remove / restore this email in the parent list (archive + undo).
+  onArchived: (id: string) => void;
+  onRestore: (id: string) => void;
 };
 
-function EmailDetail({ email, onBack }: EmailDetailProps) {
+function EmailDetail({ email, onBack, onArchived, onRestore }: EmailDetailProps) {
   const tier = resolvePriorityTier(email.priorityLevel);
   const { accentVar, softVar } = tierStyle(tier);
   // confidenceScore is already a 0-100 percentage; clamp defensively.
@@ -758,7 +803,10 @@ function EmailDetail({ email, onBack }: EmailDetailProps) {
             {confidencePct}% confidence
           </span>
         </div>
-        <FeedbackButtons emailMessageId={email.id} />
+        <ActionButtons emailMessageId={email.id} onArchived={onArchived} onRestore={onRestore} />
+        <div className="border-t border-[var(--hairline)] pt-3">
+          <FeedbackButtons emailMessageId={email.id} />
+        </div>
       </div>
     </article>
   );

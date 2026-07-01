@@ -1,10 +1,42 @@
 import { OAuth2Client } from "google-auth-library";
 
 /**
- * Gmail OAuth wiring. Read-only is the narrowest scope that still lets us read
- * message content for classification — we never request send/modify/delete.
+ * Gmail OAuth wiring.
+ *
+ * - `gmail.readonly` lets us read message content for classification.
+ * - `gmail.modify` lets us change labels (archive = remove INBOX, un-archive =
+ *   add INBOX). It does NOT let us delete/trash — we never call trash/delete.
+ * - `gmail.compose` lets us create DRAFT replies. We deliberately never request
+ *   `gmail.send`: this app can draft a reply for the user to review, but it can
+ *   never send mail on their behalf.
  */
-export const GMAIL_SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"];
+export const GMAIL_SCOPES = [
+  "https://www.googleapis.com/auth/gmail.readonly",
+  "https://www.googleapis.com/auth/gmail.modify",
+  "https://www.googleapis.com/auth/gmail.compose",
+];
+
+/**
+ * The subset of {@link GMAIL_SCOPES} that grant WRITE access (label changes +
+ * draft compose). An account connected before these scopes existed will have
+ * only `gmail.readonly` stored, so the UI must prompt a reconnect before any
+ * write action. {@link hasWriteScopes} is the pure check used for that gate.
+ */
+export const GMAIL_WRITE_SCOPES = [
+  "https://www.googleapis.com/auth/gmail.modify",
+  "https://www.googleapis.com/auth/gmail.compose",
+];
+
+/**
+ * Pure predicate: does a stored space-separated scope string include BOTH write
+ * scopes? Google stores granted scopes as a single space-separated string (see
+ * {@link ExchangedTokens.scope}); this parses that format without any DB or SDK
+ * dependency so it is trivially unit-testable and reusable by the status route.
+ */
+export function hasWriteScopes(scopesString: string): boolean {
+  const granted = new Set(scopesString.split(/\s+/).filter((s) => s !== ""));
+  return GMAIL_WRITE_SCOPES.every((scope) => granted.has(scope));
+}
 
 const PROVIDER = "google";
 
