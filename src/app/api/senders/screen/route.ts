@@ -6,7 +6,7 @@ import { getAccessToken } from "@/lib/google/tokens";
 import { archiveStoredBySender } from "@/lib/sync";
 
 const screenSchema = z.object({
-  senderEmail: z.string().min(1),
+  senderEmail: z.string().email().max(254),
   // Optional display name for a nicer rule text; falls back to the email.
   senderName: z.string().optional(),
   decision: z.enum(["in", "out"]),

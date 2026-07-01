@@ -37,9 +37,20 @@ export async function POST(_request: Request, context: RouteContext): Promise<Ne
 
   try {
     // Trusted grounding context — never mixed with the untrusted email body.
+    // Best-effort: a failure here just means we draft without that context, so
+    // we log which lookup failed (for id) rather than swallowing it silently.
     const [rules, feedbackSummary] = await Promise.all([
-      loadActiveRuleTexts(prisma).catch(() => []),
-      loadSenderFeedbackSummary(prisma, email.senderEmail).catch(() => []),
+      loadActiveRuleTexts(prisma).catch((err) => {
+        console.warn(`[emails/draft] loadActiveRuleTexts failed emailMessageId=${email.id}:`, err);
+        return [] as string[];
+      }),
+      loadSenderFeedbackSummary(prisma, email.senderEmail).catch((err) => {
+        console.warn(
+          `[emails/draft] loadSenderFeedbackSummary failed emailMessageId=${email.id}:`,
+          err,
+        );
+        return [] as string[];
+      }),
     ]);
 
     const draftInput: ReplyDraftEmail = {

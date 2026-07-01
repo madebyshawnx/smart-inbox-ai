@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseListUnsubscribe } from "../../src/lib/unsubscribe";
+import { isDisallowedUnsubscribeHost, parseListUnsubscribe } from "../../src/lib/unsubscribe";
 
 describe("parseListUnsubscribe", () => {
   it("extracts an https-only unsubscribe URL", () => {
@@ -74,5 +74,61 @@ describe("parseListUnsubscribe", () => {
     const result = parseListUnsubscribe("<http://ex.com/u>", "List-Unsubscribe=One-Click");
     expect(result.httpsUrl).toBeNull();
     expect(result.oneClick).toBe(false);
+  });
+});
+
+describe("isDisallowedUnsubscribeHost (SSRF guard)", () => {
+  it("allows ordinary public hostnames", () => {
+    expect(isDisallowedUnsubscribeHost("ex.com")).toBe(false);
+    expect(isDisallowedUnsubscribeHost("mail.sendgrid.net")).toBe(false);
+    expect(isDisallowedUnsubscribeHost("sub.domain.example.co.uk")).toBe(false);
+    // A public IPv4.
+    expect(isDisallowedUnsubscribeHost("8.8.8.8")).toBe(false);
+  });
+
+  it("rejects loopback (127.0.0.0/8) and localhost", () => {
+    expect(isDisallowedUnsubscribeHost("127.0.0.1")).toBe(true);
+    expect(isDisallowedUnsubscribeHost("127.1.2.3")).toBe(true);
+    expect(isDisallowedUnsubscribeHost("localhost")).toBe(true);
+    expect(isDisallowedUnsubscribeHost("api.localhost")).toBe(true);
+  });
+
+  it("rejects RFC 1918 private ranges", () => {
+    expect(isDisallowedUnsubscribeHost("10.0.0.1")).toBe(true);
+    expect(isDisallowedUnsubscribeHost("10.255.255.255")).toBe(true);
+    expect(isDisallowedUnsubscribeHost("172.16.0.1")).toBe(true);
+    expect(isDisallowedUnsubscribeHost("172.31.255.255")).toBe(true);
+    expect(isDisallowedUnsubscribeHost("192.168.1.1")).toBe(true);
+    // 172.15 and 172.32 are PUBLIC (outside the /12).
+    expect(isDisallowedUnsubscribeHost("172.15.0.1")).toBe(false);
+    expect(isDisallowedUnsubscribeHost("172.32.0.1")).toBe(false);
+  });
+
+  it("rejects link-local, including the cloud metadata endpoint", () => {
+    expect(isDisallowedUnsubscribeHost("169.254.169.254")).toBe(true);
+    expect(isDisallowedUnsubscribeHost("169.254.0.1")).toBe(true);
+  });
+
+  it("rejects 0.0.0.0/8 (this host)", () => {
+    expect(isDisallowedUnsubscribeHost("0.0.0.0")).toBe(true);
+  });
+
+  it("rejects IPv6 loopback and unique-local / link-local literals", () => {
+    expect(isDisallowedUnsubscribeHost("::1")).toBe(true);
+    expect(isDisallowedUnsubscribeHost("[::1]")).toBe(true);
+    expect(isDisallowedUnsubscribeHost("fc00::1")).toBe(true);
+    expect(isDisallowedUnsubscribeHost("fd12:3456::1")).toBe(true);
+    expect(isDisallowedUnsubscribeHost("fe80::1")).toBe(true);
+    // IPv4-mapped loopback.
+    expect(isDisallowedUnsubscribeHost("::ffff:127.0.0.1")).toBe(true);
+  });
+
+  it("fails closed on an empty host and normalizes a trailing dot", () => {
+    expect(isDisallowedUnsubscribeHost("")).toBe(true);
+    expect(isDisallowedUnsubscribeHost("   ")).toBe(true);
+    // Trailing-dot FQDN form of localhost still rejected.
+    expect(isDisallowedUnsubscribeHost("localhost.")).toBe(true);
+    // Trailing-dot public host still allowed.
+    expect(isDisallowedUnsubscribeHost("ex.com.")).toBe(false);
   });
 });

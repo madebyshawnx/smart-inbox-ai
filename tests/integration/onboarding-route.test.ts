@@ -1,6 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/db", () => ({ prisma: {} }));
+// The route now wraps rule creation in prisma.$transaction(async (tx) => ...).
+// Provide a $transaction that invokes the callback with a truthy tx client so
+// createRule still receives a non-null client (asserted via expect.anything()).
+vi.mock("@/lib/db", () => ({
+  prisma: {
+    $transaction: <T>(fn: (tx: unknown) => Promise<T>): Promise<T> => fn({ __tx: true }),
+  },
+}));
 
 vi.mock("@/lib/rules", () => ({
   createRule: vi.fn(),

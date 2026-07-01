@@ -19,14 +19,28 @@ export async function POST(): Promise<NextResponse> {
     // Best-effort: revoke the Google grant before we drop the stored tokens.
     await revokeAccess(prisma);
 
-    const userFeedback = await prisma.userFeedback.deleteMany();
-    const emailClassifications = await prisma.emailClassification.deleteMany();
-    const emails = await prisma.emailMessage.deleteMany();
-    const rules = await prisma.smartRule.deleteMany();
-    const priorityProfiles = await prisma.priorityProfile.deleteMany();
-    const dismissedSuggestions = await prisma.dismissedSuggestion.deleteMany();
-    const dailyEmailBriefs = await prisma.dailyEmailBrief.deleteMany();
-    const connectedAccounts = await prisma.connectedAccount.deleteMany();
+    // All-or-nothing: wrap every deleteMany in a single transaction so a partial
+    // failure can't leave the user's data half-wiped. The order is already
+    // FK-safe (children before the parents they reference).
+    const [
+      userFeedback,
+      emailClassifications,
+      emails,
+      rules,
+      priorityProfiles,
+      dismissedSuggestions,
+      dailyEmailBriefs,
+      connectedAccounts,
+    ] = await prisma.$transaction([
+      prisma.userFeedback.deleteMany(),
+      prisma.emailClassification.deleteMany(),
+      prisma.emailMessage.deleteMany(),
+      prisma.smartRule.deleteMany(),
+      prisma.priorityProfile.deleteMany(),
+      prisma.dismissedSuggestion.deleteMany(),
+      prisma.dailyEmailBrief.deleteMany(),
+      prisma.connectedAccount.deleteMany(),
+    ]);
 
     return NextResponse.json({
       ok: true,
@@ -41,7 +55,8 @@ export async function POST(): Promise<NextResponse> {
         connectedAccounts: connectedAccounts.count,
       },
     });
-  } catch {
+  } catch (err) {
+    console.error("[user/delete-data] delete failed:", err);
     return NextResponse.json({ error: "Could not delete your data." }, { status: 500 });
   }
 }

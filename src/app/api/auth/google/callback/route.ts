@@ -50,11 +50,19 @@ export async function GET(request: Request): Promise<NextResponse> {
     return redirectHome(request, "error", `oauth_state_check_failed:${why}`);
   }
 
+  // Track which phase we're in so a thrown error maps to a STABLE reason code
+  // instead of leaking the raw err.message (which can carry tokens, provider
+  // internals, or DB/crypto detail) into the redirect URL. Anything outside a
+  // known phase falls through to the neutral "unexpected_error".
+  let phase: "connect" | "persist" | "unexpected" = "unexpected";
   try {
+    phase = "connect";
     const client = createOAuthClient();
     const tokens = await exchangeCodeForTokens(client, code);
     const email = await getProfileEmail(tokens.accessToken);
 
+    // Everything past here is persistence/crypto — a failure is account_save_failed.
+    phase = "persist";
     await saveConnectedAccount(prisma, {
       email,
       accessToken: tokens.accessToken,
@@ -67,8 +75,15 @@ export async function GET(request: Request): Promise<NextResponse> {
   } catch (err) {
     // Log the real cause (token exchange / profile fetch / token encryption /
     // DB write) so a failed connect is diagnosable in Vercel logs instead of
-    // silently bouncing back with ?gmail=error.
+    // silently bouncing back with ?gmail=error. The URL only ever gets a stable
+    // code — never err.message.
     console.error("[auth/google/callback] connect failed:", err);
-    return redirectHome(request, "error", err instanceof Error ? err.message : String(err));
+    const reason =
+      phase === "persist"
+        ? "account_save_failed"
+        : phase === "connect"
+          ? "connect_failed"
+          : "unexpected_error";
+    return redirectHome(request, "error", reason);
   }
 }

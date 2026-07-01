@@ -164,7 +164,12 @@ export async function fetchRecentEmails(accessToken: string, maxResults = 25): P
     ids.map((id) =>
       getMessage(accessToken, id)
         .then(normalizeGmailMessage)
-        .catch(() => null),
+        .catch((err) => {
+          // Per-message failure is non-fatal: log which id was skipped so a
+          // systematically-failing message isn't invisible, then drop it.
+          console.warn(`[fetchRecentEmails] skipping message id=${id}:`, err);
+          return null;
+        }),
     ),
   );
   return messages.filter((m): m is RawEmail => m !== null);

@@ -126,7 +126,7 @@ export function FeedbackButtons({ emailMessageId }: FeedbackButtonsProps) {
                     : "rounded-full border border-[var(--hairline)] bg-[var(--surface-raised)] px-2.5 py-1 text-xs font-medium text-[var(--ink-700)] shadow-[var(--shadow-sm)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-50"
                 }
               >
-                {isDone && <Check size={12} />}
+                {isDone && <Check size={12} aria-hidden="true" />}
                 {pending === action.type ? "…" : action.label}
               </button>
             );

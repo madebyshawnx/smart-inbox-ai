@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { buildRulesFromAnswers, type OnboardingAnswers } from "@/lib/onboarding";
+import { Modal, ModalClose, ModalContent, ModalTitle } from "./ui/modal";
 
 type OnboardingQuestionnaireProps = {
   open: boolean;
@@ -66,8 +67,8 @@ const EMPTY_ANSWERS: OnboardingAnswers = {
  * `POST /api/onboarding`. On success it toasts "Added N rules" and reloads so the
  * dashboard reflects the new personalization.
  *
- * Visual language matches AskInbox / the settings drawer: scrim, centered card,
- * design tokens, Escape closes, the first field is focused on open.
+ * Built on the shared Radix {@link Modal} (focus trap, scroll-lock, Escape,
+ * aria-modal, focus return); the first field is focused on open.
  */
 export function OnboardingQuestionnaire({ open, onClose }: OnboardingQuestionnaireProps) {
   const [answers, setAnswers] = useState<OnboardingAnswers>(EMPTY_ANSWERS);
@@ -85,13 +86,6 @@ export function OnboardingQuestionnaire({ open, onClose }: OnboardingQuestionnai
   const setField = useCallback((key: keyof OnboardingAnswers, value: string) => {
     setAnswers((prev) => ({ ...prev, [key]: value }));
   }, []);
-
-  function handleKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      onClose();
-    }
-  }
 
   const handleSubmit = useCallback(
     async (event: React.FormEvent<HTMLFormElement>) => {
@@ -128,26 +122,21 @@ export function OnboardingQuestionnaire({ open, onClose }: OnboardingQuestionnai
     [answers, submitting, onClose],
   );
 
-  if (!open) {
-    return null;
-  }
-
   return (
-    <div className="fixed inset-0 z-[60] flex items-start justify-center px-4 pt-[8vh] pb-[8vh] sm:pt-[10vh]">
-      {/* Scrim */}
-      <button
-        type="button"
-        aria-label="Close priority setup"
-        onClick={onClose}
-        className="absolute inset-0 bg-[oklch(20%_0.02_260_/_0.35)] backdrop-blur-[2px]"
-      />
-
-      <div
-        role="dialog"
-        aria-modal="true"
+    <Modal
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) {
+          onClose();
+        }
+      }}
+    >
+      <ModalContent
         aria-label="Set up your priorities"
-        onKeyDown={handleKeyDown}
-        className="relative flex max-h-full w-full max-w-xl flex-col overflow-hidden rounded-[var(--radius-card)] border border-[var(--hairline)] bg-[var(--surface-raised)] shadow-[0_24px_64px_-24px_rgba(20,20,40,0.45)]"
+        wrapperClassName="pt-[8vh] pb-[8vh] sm:pt-[10vh]"
+        className="max-h-[84vh]"
+        // Drive focus to the first field ourselves rather than the close button.
+        onOpenAutoFocus={(event) => event.preventDefault()}
       >
         <header className="flex items-start justify-between gap-3 border-b border-[var(--hairline)] px-5 py-4">
           <div className="flex items-center gap-2">
@@ -158,22 +147,20 @@ export function OnboardingQuestionnaire({ open, onClose }: OnboardingQuestionnai
               ✨
             </span>
             <div>
-              <h2 className="text-base font-semibold tracking-tight text-[var(--ink-900)]">
+              <ModalTitle className="text-base font-semibold tracking-tight text-[var(--ink-900)]">
                 Set up your priorities
-              </h2>
+              </ModalTitle>
               <p className="mt-0.5 text-xs text-[var(--ink-500)]">
                 Answer what's useful — every question is optional.
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
+          <ModalClose
             aria-label="Close priority setup"
             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-chip)] text-[var(--ink-500)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--ink-900)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
           >
             <span aria-hidden="true">✕</span>
-          </button>
+          </ModalClose>
         </header>
 
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
@@ -220,7 +207,7 @@ export function OnboardingQuestionnaire({ open, onClose }: OnboardingQuestionnai
             </button>
           </footer>
         </form>
-      </div>
-    </div>
+      </ModalContent>
+    </Modal>
   );
 }

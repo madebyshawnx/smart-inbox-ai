@@ -190,6 +190,7 @@ export function ActionButtons({
           emailMessageId={emailMessageId}
           prominent={showUnsubscribe}
           onArchiveWithUndo={archiveWithUndo}
+          onRestore={onRestore}
         />
       </div>
       <ScreenSenderControl senderEmail={senderEmail} senderName={senderName} />
@@ -203,8 +204,11 @@ type UnsubscribeButtonProps = {
   // render as a quieter ghost button so it stays available but out of the way.
   prominent: boolean;
   // Optimistically archive after a successful one-click unsubscribe (with undo).
-  // Throws on failure so we can leave the email in place.
+  // archiveWithUndo optimistically removes the row up front, so on failure we
+  // must restore it (mirroring archive()) — onRestore does exactly that.
   onArchiveWithUndo: (title: string, description: string) => Promise<void>;
+  // Restore the optimistically-removed row if the post-unsubscribe archive fails.
+  onRestore: (id: string) => void;
 };
 
 /**
@@ -220,6 +224,7 @@ function UnsubscribeButton({
   emailMessageId,
   prominent,
   onArchiveWithUndo,
+  onRestore,
 }: UnsubscribeButtonProps) {
   const [isBusy, setIsBusy] = useState(false);
 
@@ -242,7 +247,10 @@ function UnsubscribeButton({
         try {
           await onArchiveWithUndo("Unsubscribed and archived", "Removed from your inbox in Gmail.");
         } catch {
-          // Unsubscribe still succeeded; just couldn't auto-archive.
+          // Unsubscribe still succeeded; the archive failed. archiveWithUndo
+          // optimistically removed the row up front, so restore it (mirroring
+          // archive()) — otherwise the email vanishes despite still being in Gmail.
+          onRestore(emailMessageId);
           toast.message("Unsubscribed, but couldn’t archive — archive it manually if you like.");
         }
         return;

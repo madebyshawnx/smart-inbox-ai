@@ -134,8 +134,10 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     return NextResponse.json({ classified, needsReview, results });
-  } catch {
-    // Never surface the underlying error: it can contain the API key or stack.
+  } catch (err) {
+    // Log the real cause server-side for diagnosis; never surface it to the
+    // client (it can contain the API key or a stack trace).
+    console.error("[classify] failed:", err);
     return NextResponse.json(
       { error: "Classification failed. Please try again." },
       { status: 500 },

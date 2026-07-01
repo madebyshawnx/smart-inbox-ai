@@ -31,6 +31,98 @@ export type ParsedListUnsubscribe = {
 const ONE_CLICK_TOKEN = "list-unsubscribe=one-click";
 
 /**
+ * SSRF guard for the one-click unsubscribe POST target.
+ *
+ * The List-Unsubscribe URL is attacker-controlled (it comes from an untrusted
+ * inbound email). Before we POST to it we must reject hostnames that resolve to
+ * the loopback, link-local, or RFC 1918 private ranges — otherwise a malicious
+ * sender could point the URL at internal infrastructure (e.g. the cloud
+ * metadata endpoint 169.254.169.254) and use our server as a confused deputy.
+ *
+ * PURE and hostname-only: it does NOT do DNS resolution (that is a runtime
+ * concern and can't be done deterministically in a unit test). It rejects
+ * literal private/loopback/link-local IPs and the obvious hostnames. Returns
+ * true when the host is DISALLOWED (must not be POSTed).
+ */
+export function isDisallowedUnsubscribeHost(hostname: string): boolean {
+  const host = hostname.trim().toLowerCase().replace(/\.$/, "");
+  if (host === "") {
+    return true;
+  }
+
+  // Bracketed / bare IPv6 loopback and unique-local (fc00::/7 → fc.. or fd..).
+  const ipv6 = host.startsWith("[") && host.endsWith("]") ? host.slice(1, -1) : host;
+  if (ipv6 === "::1" || ipv6 === "::" || ipv6 === "0:0:0:0:0:0:0:1") {
+    return true;
+  }
+  if (ipv6.includes(":")) {
+    // fc00::/7 unique-local addresses start with fc or fd.
+    if (/^f[cd][0-9a-f]*:/.test(ipv6)) {
+      return true;
+    }
+    // IPv4-mapped IPv6 (e.g. ::ffff:127.0.0.1) — fall through to the v4 check
+    // on the trailing dotted-quad if present.
+    const mapped = ipv6.match(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/);
+    if (mapped) {
+      return isDisallowedIpv4(mapped[1]);
+    }
+    // Any other IPv6 literal we can't positively vet: allow (public), but the
+    // common private ones above are covered. Link-local fe80::/10:
+    if (/^fe[89ab][0-9a-f]*:/.test(ipv6)) {
+      return true;
+    }
+    return false;
+  }
+
+  // Loopback / localhost hostnames.
+  if (host === "localhost" || host.endsWith(".localhost")) {
+    return true;
+  }
+
+  // Literal IPv4 → range check.
+  if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host)) {
+    return isDisallowedIpv4(host);
+  }
+
+  return false;
+}
+
+/** True when a dotted-quad IPv4 is in a loopback/private/link-local range. */
+function isDisallowedIpv4(ip: string): boolean {
+  const parts = ip.split(".").map((p) => Number(p));
+  if (parts.length !== 4 || parts.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) {
+    // Malformed → treat as disallowed (fail closed).
+    return true;
+  }
+  const [a, b] = parts;
+  // 127.0.0.0/8 loopback
+  if (a === 127) {
+    return true;
+  }
+  // 10.0.0.0/8 private
+  if (a === 10) {
+    return true;
+  }
+  // 172.16.0.0/12 private (172.16 - 172.31)
+  if (a === 172 && b >= 16 && b <= 31) {
+    return true;
+  }
+  // 192.168.0.0/16 private
+  if (a === 192 && b === 168) {
+    return true;
+  }
+  // 169.254.0.0/16 link-local (includes the 169.254.169.254 metadata endpoint)
+  if (a === 169 && b === 254) {
+    return true;
+  }
+  // 0.0.0.0/8 "this host"
+  if (a === 0) {
+    return true;
+  }
+  return false;
+}
+
+/**
  * Extract the bracketed URIs from a `List-Unsubscribe` header value. Robust to
  * missing/extra whitespace and to entries that are not wrapped in angle brackets
  * (some senders omit them). Returns entries in header order.

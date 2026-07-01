@@ -1,5 +1,6 @@
 "use client";
 
+import * as DialogPrimitive from "@radix-ui/react-dialog";
 import {
   AlertTriangle,
   Archive,
@@ -38,7 +39,7 @@ import { OnboardingQuestionnaire } from "./OnboardingQuestionnaire";
 import { resolvePriorityTier, tierStyle } from "./priority-style";
 import { SmartRulesManager } from "./SmartRulesManager";
 import { SuggestedRules } from "./SuggestedRules";
-import { Sheet, SheetContent, SheetTitle } from "./ui/sheet";
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from "./ui/sheet";
 import { WhyThisMattersPanel } from "./WhyThisMattersPanel";
 
 type InboxWorkspaceProps = {
@@ -611,16 +612,23 @@ export function InboxWorkspace({ data, hasRules = true }: InboxWorkspaceProps) {
           />
         </div>
 
-        {/* LEFT RAIL — overlay on < md */}
-        {mobileRailOpen && (
-          <div className="fixed inset-0 z-50 flex md:hidden">
-            <button
-              type="button"
-              aria-label="Close navigation"
-              onClick={() => setMobileRailOpen(false)}
-              className="absolute inset-0 bg-[oklch(20%_0.02_260_/_0.35)]"
-            />
-            <div className="relative h-full">
+        {/* LEFT RAIL — overlay on < md. Wrapped in a Radix Dialog so Tab is
+            trapped inside the rail (can't escape behind the scrim), Escape closes,
+            body scroll locks, and focus returns to the opener on close. */}
+        <DialogPrimitive.Root
+          open={mobileRailOpen}
+          onOpenChange={(next) => setMobileRailOpen(next)}
+        >
+          <DialogPrimitive.Portal>
+            <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-[oklch(20%_0.02_260_/_0.35)] data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 md:hidden" />
+            <DialogPrimitive.Content
+              aria-label="Inbox navigation"
+              className="fixed inset-y-0 left-0 z-50 flex h-full w-auto data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left md:hidden"
+            >
+              <DialogPrimitive.Title className="sr-only">Inbox navigation</DialogPrimitive.Title>
+              <DialogPrimitive.Description className="sr-only">
+                Jump to a bucket, search, ask your inbox, or open settings.
+              </DialogPrimitive.Description>
               <LeftRail
                 sections={sections}
                 selectedBucket={selectedBucket}
@@ -649,9 +657,9 @@ export function InboxWorkspace({ data, hasRules = true }: InboxWorkspaceProps) {
                   setInsightsOpen(true);
                 }}
               />
-            </div>
-          </div>
-        )}
+            </DialogPrimitive.Content>
+          </DialogPrimitive.Portal>
+        </DialogPrimitive.Root>
 
         {/* LIST PANE — width is user-draggable on desktop via the handle below. */}
         <aside
@@ -699,10 +707,11 @@ export function InboxWorkspace({ data, hasRules = true }: InboxWorkspaceProps) {
           </div>
         </aside>
 
-        {/* Drag handle — resize the list pane (desktop only). */}
-        {/* biome-ignore lint/a11y/useSemanticElements: a draggable resize separator has no semantic HTML equivalent */}
+        {/* Drag handle — resize the list pane (desktop only). role="slider"
+            (not "separator") so aria-valuenow/min/max are conveyed as an
+            adjustable value; keyboard arrows nudge the width. */}
         <div
-          role="separator"
+          role="slider"
           aria-orientation="vertical"
           aria-label="Resize inbox list"
           aria-valuenow={Math.round(listWidth)}
@@ -853,7 +862,7 @@ function ListSearch({ value, onChange }: ListSearchProps) {
               inputRef.current?.focus();
             }}
             aria-label="Clear search"
-            className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--ink-500)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--ink-900)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-[var(--ink-500)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--ink-900)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
           >
             <X size={13} />
           </button>
@@ -954,7 +963,7 @@ function ThreadRow({ group, selectedId, viewedIds, expanded, onSelect, onToggle 
               ? `Collapse thread of ${group.count} messages`
               : `Show ${olderCount} more in thread`
           }
-          className="absolute top-2 right-3 flex items-center gap-1 rounded-full border border-[var(--hairline)] bg-[var(--surface-raised)] px-2 py-0.5 text-[0.65rem] font-semibold text-[var(--ink-500)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+          className="absolute top-2 right-3 flex min-h-[24px] items-center gap-1 rounded-full border border-[var(--hairline)] bg-[var(--surface-raised)] px-2 py-0.5 text-[0.65rem] font-semibold text-[var(--ink-500)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
         >
           <ChevronDown
             size={11}
@@ -1011,7 +1020,7 @@ function SectionHeader({ label, count, onArchiveAll }: SectionHeaderProps) {
           type="button"
           onClick={onArchiveAll}
           aria-label={`Archive all ${count} email${count === 1 ? "" : "s"} in ${label}`}
-          className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[var(--hairline)] bg-[var(--surface-raised)] px-2 py-0.5 text-[0.65rem] font-semibold text-[var(--ink-500)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+          className="inline-flex min-h-[24px] shrink-0 items-center gap-1 rounded-full border border-[var(--hairline)] bg-[var(--surface-raised)] px-2 py-0.5 text-[0.65rem] font-semibold text-[var(--ink-500)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
         >
           <Archive size={11} aria-hidden="true" />
           Archive all
@@ -1254,11 +1263,15 @@ function SettingsDrawer({
 }: SettingsDrawerProps) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent aria-describedby={undefined}>
+      <SheetContent>
         <header className="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--hairline)] bg-[var(--surface)] px-5 py-4">
           <SheetTitle className="text-base font-semibold tracking-tight text-[var(--ink-900)]">
             Settings
           </SheetTitle>
+          <SheetDescription className="sr-only">
+            Manage your Gmail connection, review what the app has learned, configure Smart Rules,
+            and access data controls.
+          </SheetDescription>
         </header>
 
         <div className="flex flex-col gap-6 px-5 py-5">

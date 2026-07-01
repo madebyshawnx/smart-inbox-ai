@@ -4,6 +4,7 @@ import { Command } from "cmdk";
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import type { EmailCard } from "@/lib/dashboard-types";
+import { Modal, ModalContent, ModalTitle } from "./ui/modal";
 
 type SyncResult = { classified: number; needsReview: number; total: number };
 
@@ -17,9 +18,11 @@ type CommandPaletteProps = {
 };
 
 /**
- * Cmd/Ctrl+K command palette. Renders a centered modal dialog over a scrim.
- * Lets the user jump to any triaged email or run a workspace action. Opening,
- * closing, and the keyboard listener are owned by the parent (InboxWorkspace).
+ * Cmd/Ctrl+K command palette. cmdk lives inside a shared Radix {@link Modal} so
+ * focus trap, scroll-lock, Escape, aria-modal, and focus return are handled by
+ * the primitive (no hand-rolled scrim <button>, which would create an inverted
+ * tab stop). Lets the user jump to any triaged email or run a workspace action.
+ * Opening/closing is owned by the parent (InboxWorkspace).
  */
 export function CommandPalette({
   open,
@@ -31,23 +34,17 @@ export function CommandPalette({
 }: CommandPaletteProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  // Focus the search input whenever the palette opens.
+  // Focus the search input whenever the palette opens. Always return the
+  // cancelAnimationFrame cleanup so a pending frame can't fire after unmount /
+  // re-render, even when `open` flips to false before paint.
   useEffect(() => {
-    if (open) {
-      // Defer to after paint so the element exists and is focusable.
-      const id = window.requestAnimationFrame(() => inputRef.current?.focus());
-      return () => window.cancelAnimationFrame(id);
+    if (!open) {
+      return;
     }
+    // Defer to after paint so the element exists and is focusable.
+    const id = window.requestAnimationFrame(() => inputRef.current?.focus());
+    return () => window.cancelAnimationFrame(id);
   }, [open]);
-
-  // Escape closes the palette. Bound on the dialog itself so it doesn't fight
-  // with the workspace list navigation while closed.
-  function handleKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      onClose();
-    }
-  }
 
   function jumpToEmail(id: string) {
     onSelectEmail(id);
@@ -86,86 +83,85 @@ export function CommandPalette({
     window.location.href = "/api/auth/google/connect";
   }
 
-  if (!open) {
-    return null;
-  }
-
   return (
-    <div className="fixed inset-0 z-[60] flex items-start justify-center px-4 pt-[12vh] sm:pt-[16vh]">
-      {/* Scrim */}
-      <button
-        type="button"
-        aria-label="Close command palette"
-        onClick={onClose}
-        className="absolute inset-0 bg-[oklch(20%_0.02_260_/_0.35)] backdrop-blur-[2px]"
-      />
-
-      <Command
-        label="Command palette"
-        onKeyDown={handleKeyDown}
-        className="relative flex w-full max-w-xl flex-col overflow-hidden rounded-[var(--radius-card)] border border-[var(--hairline)] bg-[var(--surface-raised)] shadow-[0_24px_64px_-24px_rgba(20,20,40,0.45)]"
+    <Modal
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) {
+          onClose();
+        }
+      }}
+    >
+      <ModalContent
+        aria-label="Command palette"
+        className="p-0"
+        // Drive focus to the cmdk input ourselves rather than the first item.
+        onOpenAutoFocus={(event) => event.preventDefault()}
       >
-        <div className="flex items-center gap-2 border-b border-[var(--hairline)] px-4">
-          <span aria-hidden="true" className="text-sm text-[var(--ink-500)]">
-            ⌘K
-          </span>
-          <Command.Input
-            ref={inputRef}
-            placeholder="Jump to an email or run an action…"
-            className="w-full bg-transparent py-3.5 text-sm text-[var(--ink-900)] outline-none placeholder:text-[var(--ink-500)]"
-          />
-        </div>
+        <ModalTitle className="sr-only">Command palette</ModalTitle>
+        <Command label="Command palette" className="flex flex-col overflow-hidden">
+          <div className="flex items-center gap-2 border-b border-[var(--hairline)] px-4">
+            <span aria-hidden="true" className="text-sm text-[var(--ink-500)]">
+              ⌘K
+            </span>
+            <Command.Input
+              ref={inputRef}
+              placeholder="Jump to an email or run an action…"
+              className="w-full bg-transparent py-3.5 text-sm text-[var(--ink-900)] outline-none placeholder:text-[var(--ink-500)]"
+            />
+          </div>
 
-        <Command.List className="max-h-[min(60vh,24rem)] overflow-y-auto p-2">
-          <Command.Empty className="px-3 py-6 text-center text-sm text-[var(--ink-500)]">
-            No results found.
-          </Command.Empty>
+          <Command.List className="max-h-[min(60vh,24rem)] overflow-y-auto p-2">
+            <Command.Empty className="px-3 py-6 text-center text-sm text-[var(--ink-500)]">
+              No results found.
+            </Command.Empty>
 
-          <Command.Group
-            heading="Actions"
-            className="[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-[0.7rem] [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:tracking-[0.12em] [&_[cmdk-group-heading]]:text-[var(--ink-500)] [&_[cmdk-group-heading]]:uppercase"
-          >
-            <PaletteItem value="Ask your inbox" icon="✨" onSelect={openAsk}>
-              Ask your inbox
-            </PaletteItem>
-            <PaletteItem value="Open Settings" icon="⚙" onSelect={openSettings}>
-              Open Settings
-            </PaletteItem>
-            <PaletteItem value="Sync inbox" icon="↻" onSelect={syncInbox}>
-              Sync inbox
-            </PaletteItem>
-            <PaletteItem value="Connect Gmail" icon="✉" onSelect={connectGmail}>
-              Connect Gmail
-            </PaletteItem>
-          </Command.Group>
-
-          {emails.length > 0 && (
             <Command.Group
-              heading="Emails"
-              className="mt-1 [&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-[0.7rem] [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:tracking-[0.12em] [&_[cmdk-group-heading]]:text-[var(--ink-500)] [&_[cmdk-group-heading]]:uppercase"
+              heading="Actions"
+              className="[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-[0.7rem] [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:tracking-[0.12em] [&_[cmdk-group-heading]]:text-[var(--ink-500)] [&_[cmdk-group-heading]]:uppercase"
             >
-              {emails.map((email) => (
-                <PaletteItem
-                  key={email.id}
-                  // Include id so senders with identical names stay distinct.
-                  value={`${email.senderName} ${email.subject} ${email.id}`}
-                  onSelect={() => jumpToEmail(email.id)}
-                >
-                  <span className="flex min-w-0 flex-col">
-                    <span className="truncate font-medium text-[var(--ink-900)]">
-                      {email.subject}
-                    </span>
-                    <span className="truncate text-xs text-[var(--ink-500)]">
-                      {email.senderName}
-                    </span>
-                  </span>
-                </PaletteItem>
-              ))}
+              <PaletteItem value="Ask your inbox" icon="✨" onSelect={openAsk}>
+                Ask your inbox
+              </PaletteItem>
+              <PaletteItem value="Open Settings" icon="⚙" onSelect={openSettings}>
+                Open Settings
+              </PaletteItem>
+              <PaletteItem value="Sync inbox" icon="↻" onSelect={syncInbox}>
+                Sync inbox
+              </PaletteItem>
+              <PaletteItem value="Connect Gmail" icon="✉" onSelect={connectGmail}>
+                Connect Gmail
+              </PaletteItem>
             </Command.Group>
-          )}
-        </Command.List>
-      </Command>
-    </div>
+
+            {emails.length > 0 && (
+              <Command.Group
+                heading="Emails"
+                className="mt-1 [&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-[0.7rem] [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:tracking-[0.12em] [&_[cmdk-group-heading]]:text-[var(--ink-500)] [&_[cmdk-group-heading]]:uppercase"
+              >
+                {emails.map((email) => (
+                  <PaletteItem
+                    key={email.id}
+                    // Include id so senders with identical names stay distinct.
+                    value={`${email.senderName} ${email.subject} ${email.id}`}
+                    onSelect={() => jumpToEmail(email.id)}
+                  >
+                    <span className="flex min-w-0 flex-col">
+                      <span className="truncate font-medium text-[var(--ink-900)]">
+                        {email.subject}
+                      </span>
+                      <span className="truncate text-xs text-[var(--ink-500)]">
+                        {email.senderName}
+                      </span>
+                    </span>
+                  </PaletteItem>
+                ))}
+              </Command.Group>
+            )}
+          </Command.List>
+        </Command>
+      </ModalContent>
+    </Modal>
   );
 }
 

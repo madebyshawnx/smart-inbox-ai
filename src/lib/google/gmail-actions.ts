@@ -20,9 +20,16 @@
  * request shape) without hitting the network or the Google SDK.
  */
 
-import { type ParsedListUnsubscribe, parseListUnsubscribe } from "@/lib/unsubscribe";
+import {
+  isDisallowedUnsubscribeHost,
+  type ParsedListUnsubscribe,
+  parseListUnsubscribe,
+} from "@/lib/unsubscribe";
 
 const GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me";
+
+// Identifies our automated one-click unsubscribe POST to the sender's endpoint.
+const UNSUBSCRIBE_USER_AGENT = "SmartInboxAI-Unsubscribe/1.0";
 
 // Node/Next runtime provides a global fetch; inject it (or a fake) for tests.
 export type FetchFn = typeof fetch;
@@ -194,6 +201,11 @@ export async function fetchUnsubscribeInfo(
  * HARD SAFETY: this ONLY ever POSTs to an https URL. It does not, and must not,
  * send email — mailto unsubscribes are handled by the UI, never here. Throws
  * (status only, no token/body leak) if the sender's endpoint rejects the POST.
+ *
+ * SSRF DEFENSE: the URL comes from an untrusted inbound email, so we parse it and
+ * reject any host that targets loopback / link-local / RFC 1918 private space
+ * (including the 169.254.169.254 cloud metadata endpoint) before POSTing. A
+ * disallowed or unparseable host fails safe — we throw and never make the request.
  */
 export async function performOneClickUnsubscribe(
   httpsUrl: string,
@@ -203,9 +215,24 @@ export async function performOneClickUnsubscribe(
     // Defense in depth: never POST to a non-https target.
     throw new Error("Unsubscribe URL must be https");
   }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(httpsUrl);
+  } catch {
+    throw new Error("Unsubscribe URL is not a valid URL");
+  }
+  if (isDisallowedUnsubscribeHost(parsed.hostname)) {
+    // SSRF guard: refuse private/loopback/link-local targets. Fail safe — no POST.
+    throw new Error("Unsubscribe URL host is not allowed");
+  }
+
   const res = await fetchFn(httpsUrl, {
     method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      "User-Agent": UNSUBSCRIBE_USER_AGENT,
+    },
     body: "List-Unsubscribe=One-Click",
   });
   if (!res.ok) {

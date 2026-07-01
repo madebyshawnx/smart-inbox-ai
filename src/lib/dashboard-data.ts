@@ -4,9 +4,9 @@ import { BUCKET_KEYS, type BucketKey, type DashboardData, type EmailCard } from 
 import { prisma } from "./db";
 import {
   type ClassifiedEmailRow,
+  type ClassifiedListMessage,
   loadClassifiedEmails,
   type PersistedClassification,
-  type PersistedMessage,
 } from "./persistence";
 
 // A DB-persisted bucket string is widened to `string`; narrow it back to a known
@@ -29,7 +29,7 @@ function toBucketKey(value: string): BucketKey {
  * is a plain JSON-safe object.
  */
 export function mapToEmailCard(
-  message: PersistedMessage,
+  message: ClassifiedListMessage,
   classification: PersistedClassification,
 ): EmailCard {
   return {

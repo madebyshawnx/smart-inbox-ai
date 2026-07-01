@@ -23,6 +23,11 @@ export const RECLASSIFY_BY_SENDER_LIMIT = 10;
 // cheap. Pagination/incremental sync can raise this later.
 export const SYNC_LIMIT = 25;
 
+// Upper bound on how many of a sender's stored messages a single "screen out +
+// archive existing" action will archive. Bounds the Gmail fan-out and the DB
+// scan the same way RECLASSIFY_BY_SENDER_LIMIT bounds the reclassify path.
+export const ARCHIVE_BY_SENDER_LIMIT = 200;
+
 export type SyncCounts = {
   classified: number;
   needsReview: number;
@@ -287,6 +292,8 @@ export async function archiveStoredBySender(
   const rows = await db.emailMessage.findMany({
     where: { senderEmail },
     select: { sourceId: true },
+    orderBy: { receivedAt: "desc" },
+    take: ARCHIVE_BY_SENDER_LIMIT,
   });
 
   let archived = 0;
@@ -301,8 +308,10 @@ export async function archiveStoredBySender(
     try {
       await archiveMessage(accessToken, gmailMessageId);
       archived += 1;
-    } catch {
+    } catch (err) {
+      // Best-effort per message: log which one failed, then keep going.
       errors += 1;
+      console.warn(`[archiveStoredBySender] archive failed sourceId=${row.sourceId}:`, err);
     }
   }
 

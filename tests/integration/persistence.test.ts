@@ -174,14 +174,20 @@ describe("loadClassifiedEmails", () => {
     mock = makeMockPrisma();
   });
 
-  it("queries only classified emails, newest first, including the classification", async () => {
+  it("queries only classified emails, newest first, selecting the classification (no bodyText) and bounded", async () => {
     await loadClassifiedEmails(asPrisma(mock));
 
     expect(mock.emailMessage.findMany).toHaveBeenCalledTimes(1);
     const arg = mock.emailMessage.findMany.mock.calls[0][0];
     expect(arg.where).toEqual({ classification: { isNot: null } });
-    expect(arg.include).toEqual({ classification: true });
+    // Uses an explicit select (not include) that pulls the classification
+    // relation but deliberately EXCLUDES bodyText.
+    expect(arg.include).toBeUndefined();
+    expect(arg.select.classification).toBe(true);
+    expect(arg.select).not.toHaveProperty("bodyText");
     expect(arg.orderBy).toEqual({ receivedAt: "desc" });
+    // Bounded to the most-recent window.
+    expect(arg.take).toBe(200);
   });
 
   it("splits each row into { message, classification } and drops null classifications", async () => {

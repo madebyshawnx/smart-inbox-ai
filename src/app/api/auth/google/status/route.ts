@@ -16,6 +16,8 @@ import { getConnectedAccount } from "@/lib/google/tokens";
 export async function GET(): Promise<NextResponse> {
   try {
     const account = await getConnectedAccount(prisma);
+    // A genuinely-absent account is NOT an error — report a clean disconnected
+    // state so the UI shows the connect affordance.
     if (account === null) {
       return NextResponse.json({ connected: false, canWrite: false });
     }
@@ -25,7 +27,11 @@ export async function GET(): Promise<NextResponse> {
       connectedAt: account.connectedAt,
       canWrite: hasWriteScopes(account.scopes),
     });
-  } catch {
-    return NextResponse.json({ connected: false, canWrite: false });
+  } catch (err) {
+    // An UNEXPECTED failure (DB down, decrypt error) must surface as a 500 — not
+    // masquerade as "disconnected" — so the client's write-state probe can tell
+    // "probe failed" (degrade gracefully) from a real, deliberate disconnect.
+    console.error("[auth/google/status] status probe failed:", err);
+    return NextResponse.json({ error: "Could not check Gmail status." }, { status: 500 });
   }
 }

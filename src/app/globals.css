@@ -7,7 +7,10 @@
 :root {
   --ink-900: oklch(24% 0.025 264);
   --ink-700: oklch(40% 0.022 264);
-  --ink-500: oklch(56% 0.018 264);
+  /* Darkened from 56% to 50% so small secondary text clears WCAG AA (4.5:1) on
+     both the white (--surface-raised, 6.0:1) and near-white (--surface, 5.7:1)
+     backgrounds — the old 56% was only ~4.4:1 on --surface. */
+  --ink-500: oklch(50% 0.02 264);
   /* App background is a faint cool tint; raised panels are pure white so the
      list/detail read as elevated surfaces against the rail. */
   --surface: oklch(98% 0.005 264);

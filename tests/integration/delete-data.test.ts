@@ -13,6 +13,10 @@ const { mockPrisma, revokeAccess } = vi.hoisted(() => ({
     dismissedSuggestion: { deleteMany: vi.fn().mockResolvedValue({ count: 6 }) },
     dailyEmailBrief: { deleteMany: vi.fn().mockResolvedValue({ count: 7 }) },
     connectedAccount: { deleteMany: vi.fn().mockResolvedValue({ count: 8 }) },
+    // The route now wraps the deletes in prisma.$transaction([...]). The array
+    // form takes an array of already-issued PrismaPromises and resolves them,
+    // preserving order — so awaiting them all mirrors the real client.
+    $transaction: vi.fn((ops: Promise<unknown>[]) => Promise.all(ops)),
   },
   revokeAccess: vi.fn().mockResolvedValue(true),
 }));
@@ -38,6 +42,7 @@ describe("POST /api/user/delete-data", () => {
     mockPrisma.dismissedSuggestion.deleteMany.mockResolvedValue({ count: 6 });
     mockPrisma.dailyEmailBrief.deleteMany.mockResolvedValue({ count: 7 });
     mockPrisma.connectedAccount.deleteMany.mockResolvedValue({ count: 8 });
+    mockPrisma.$transaction.mockImplementation((ops: Promise<unknown>[]) => Promise.all(ops));
     revokeAccess.mockResolvedValue(true);
   });
 

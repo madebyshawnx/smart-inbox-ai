@@ -206,26 +206,53 @@ export type PersistedClassification = {
   createdAt: Date;
 };
 
+// The message shape returned by the LIST query. `bodyText` is deliberately
+// EXCLUDED: the dashboard/EmailCard and suggestions never render the full body,
+// so we neither select nor ship it (data minimization + smaller payloads).
+export type ClassifiedListMessage = Omit<PersistedMessage, "bodyText">;
+
 export type ClassifiedEmailRow = {
-  message: PersistedMessage;
+  message: ClassifiedListMessage;
   classification: PersistedClassification;
 };
 
+// Cap the list query. The dashboard and suggestions only need a recent window,
+// not the entire history, so we bound the scan (and the payload) to the most
+// recent N by receivedAt. reclassifyStoredBySender has its OWN query and is
+// unaffected by this limit.
+export const CLASSIFIED_LIST_LIMIT = 200;
+
 /**
- * Load every email that has a classification, newest first, with the
+ * Load recent emails that have a classification, newest first, with the
  * classification relation included. Messages without a classification are
  * excluded at the query level so callers always get a present classification.
+ *
+ * Bounded to {@link CLASSIFIED_LIST_LIMIT} most-recent rows and selects only the
+ * columns the dashboard/suggestions consume — notably NOT `bodyText`.
  */
 export async function loadClassifiedEmails(db: PrismaClient): Promise<ClassifiedEmailRow[]> {
   const rows = await db.emailMessage.findMany({
     where: { classification: { isNot: null } },
-    include: { classification: true },
+    // Explicit select excludes bodyText; include the classification relation.
+    select: {
+      id: true,
+      sourceId: true,
+      threadId: true,
+      senderName: true,
+      senderEmail: true,
+      subject: true,
+      receivedAt: true,
+      gmailLabels: true,
+      createdAt: true,
+      classification: true,
+    },
     orderBy: { receivedAt: "desc" },
+    take: CLASSIFIED_LIST_LIMIT,
   });
 
   return rows
     .map((row) => {
-      const { classification, ...message } = row as PersistedMessage & {
+      const { classification, ...message } = row as ClassifiedListMessage & {
         classification: PersistedClassification | null;
       };
       if (classification === null) {

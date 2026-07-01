@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { Modal, ModalClose, ModalContent, ModalTitle } from "./ui/modal";
 
 type AskInboxProps = {
   open: boolean;
@@ -19,9 +20,9 @@ const EXAMPLE_QUESTIONS = [
  * gets an AI answer grounded in their already-triaged emails. Read-only — it
  * only POSTs the question to /api/ask, which reads existing classifications.
  *
- * Visual language matches the command palette / settings drawer: a scrim plus a
- * centered card built on the shared design tokens. Escape closes; the input is
- * focused on open. The user can ask follow-up questions without closing.
+ * Built on the shared Radix {@link Modal} (focus trap, scroll-lock, Escape,
+ * aria-modal, focus return) so accessibility isn't hand-rolled. The input is
+ * focused on open; the user can ask follow-up questions without closing.
  */
 export function AskInbox({ open, onClose }: AskInboxProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -36,13 +37,6 @@ export function AskInbox({ open, onClose }: AskInboxProps) {
       return () => window.cancelAnimationFrame(id);
     }
   }, [open]);
-
-  function handleKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      onClose();
-    }
-  }
 
   const askQuestion = useCallback(async (q: string) => {
     const trimmed = q.trim();
@@ -79,26 +73,20 @@ export function AskInbox({ open, onClose }: AskInboxProps) {
     inputRef.current?.focus();
   }
 
-  if (!open) {
-    return null;
-  }
-
   return (
-    <div className="fixed inset-0 z-[60] flex items-start justify-center px-4 pt-[12vh] sm:pt-[16vh]">
-      {/* Scrim */}
-      <button
-        type="button"
-        aria-label="Close ask your inbox"
-        onClick={onClose}
-        className="absolute inset-0 bg-[oklch(20%_0.02_260_/_0.35)] backdrop-blur-[2px]"
-      />
-
-      <div
-        role="dialog"
-        aria-modal="true"
+    <Modal
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) {
+          onClose();
+        }
+      }}
+    >
+      <ModalContent
         aria-label="Ask your inbox"
-        onKeyDown={handleKeyDown}
-        className="relative flex w-full max-w-xl flex-col overflow-hidden rounded-[var(--radius-card)] border border-[var(--hairline)] bg-[var(--surface-raised)] shadow-[0_24px_64px_-24px_rgba(20,20,40,0.45)]"
+        // Radix auto-focuses the first focusable element; we drive focus to the
+        // input ourselves (via the effect) so the close button isn't focused first.
+        onOpenAutoFocus={(event) => event.preventDefault()}
       >
         <header className="flex items-center justify-between border-b border-[var(--hairline)] px-5 py-4">
           <div className="flex items-center gap-2">
@@ -108,18 +96,16 @@ export function AskInbox({ open, onClose }: AskInboxProps) {
             >
               ✨
             </span>
-            <h2 className="text-base font-semibold tracking-tight text-[var(--ink-900)]">
+            <ModalTitle className="text-base font-semibold tracking-tight text-[var(--ink-900)]">
               Ask your inbox
-            </h2>
+            </ModalTitle>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
+          <ModalClose
             aria-label="Close ask your inbox"
             className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-chip)] text-[var(--ink-500)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--ink-900)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
           >
             <span aria-hidden="true">✕</span>
-          </button>
+          </ModalClose>
         </header>
 
         <div className="flex flex-col gap-4 px-5 py-5">
@@ -176,7 +162,7 @@ export function AskInbox({ open, onClose }: AskInboxProps) {
             </div>
           )}
         </div>
-      </div>
-    </div>
+      </ModalContent>
+    </Modal>
   );
 }

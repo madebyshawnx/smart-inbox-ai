@@ -224,11 +224,32 @@ describe("performOneClickUnsubscribe", () => {
     expect(init.method).toBe("POST");
     expect(init.body).toBe("List-Unsubscribe=One-Click");
     expect(init.headers["Content-Type"]).toBe("application/x-www-form-urlencoded");
+    // Sends an identifying User-Agent.
+    expect(init.headers["User-Agent"]).toMatch(/SmartInboxAI/);
   });
 
   it("refuses to POST a non-https URL", async () => {
     const fetchFn = vi.fn() as unknown as FetchFn;
     await expect(performOneClickUnsubscribe("http://ex.com/u", fetchFn)).rejects.toThrow(/https/);
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it("refuses to POST a private/loopback/link-local host (SSRF guard)", async () => {
+    const fetchFn = vi.fn() as unknown as FetchFn;
+    // Cloud metadata endpoint — the classic SSRF target.
+    await expect(
+      performOneClickUnsubscribe("https://169.254.169.254/latest/meta-data", fetchFn),
+    ).rejects.toThrow(/not allowed/);
+    await expect(performOneClickUnsubscribe("https://127.0.0.1/u", fetchFn)).rejects.toThrow(
+      /not allowed/,
+    );
+    await expect(performOneClickUnsubscribe("https://10.0.0.5/u", fetchFn)).rejects.toThrow(
+      /not allowed/,
+    );
+    await expect(performOneClickUnsubscribe("https://localhost/u", fetchFn)).rejects.toThrow(
+      /not allowed/,
+    );
+    // Never made a request for any of them.
     expect(fetchFn).not.toHaveBeenCalled();
   });
 

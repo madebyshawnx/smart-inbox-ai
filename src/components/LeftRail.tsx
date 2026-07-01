@@ -91,6 +91,7 @@ export function LeftRail({
           onClick={onToggleCollapse}
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           aria-expanded={!collapsed}
+          aria-controls="left-rail-nav-body"
           className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-chip)] text-[var(--ink-500)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--ink-900)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
         >
           {collapsed ? <PanelLeft size={17} /> : <PanelLeftClose size={17} />}
@@ -98,7 +99,10 @@ export function LeftRail({
       </div>
 
       {/* Scrollable nav body */}
-      <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-2 py-3">
+      <div
+        id="left-rail-nav-body"
+        className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-2 py-3"
+      >
         <AskButton collapsed={collapsed} onOpenAsk={onOpenAsk} />
         <SearchButton collapsed={collapsed} onOpenSearch={onOpenSearch} />
         <LearnedButton collapsed={collapsed} onOpenLearned={onOpenLearned} />

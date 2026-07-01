@@ -48,10 +48,21 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   try {
-    const created = [];
-    for (const rule of parsed.data.rules) {
-      created.push(await createRule(prisma, rule));
-    }
+    // All-or-nothing: create every rule inside one transaction so a mid-loop
+    // failure can't leave the user with a half-applied onboarding set. The
+    // failing index is logged for diagnosis before the error propagates out.
+    const created = await prisma.$transaction(async (tx) => {
+      const out: Awaited<ReturnType<typeof createRule>>[] = [];
+      for (let i = 0; i < parsed.data.rules.length; i++) {
+        try {
+          out.push(await createRule(tx as typeof prisma, parsed.data.rules[i]));
+        } catch (err) {
+          console.error(`[onboarding] createRule failed at index ${i}:`, err);
+          throw err;
+        }
+      }
+      return out;
+    });
     return NextResponse.json({ created }, { status: 201 });
   } catch (error) {
     if (error instanceof Error && VALIDATION_MESSAGES.has(error.message)) {
