@@ -42,7 +42,25 @@ describe("applyFeedback", () => {
 
     expect(db.userFeedback.create).toHaveBeenCalledTimes(1);
     expect(db.smartRule.create).not.toHaveBeenCalled();
-    expect(result).toEqual({ ruleCreated: false, ruleText: null });
+    // senderEmail is null here because makeDb() returns no email for the lookup.
+    expect(result).toEqual({ ruleCreated: false, ruleText: null, senderEmail: null });
+  });
+
+  it("attributes non-sender feedback to its sender so it can drive re-classification", async () => {
+    const db = makeDb({ email: sender });
+    const result = await applyFeedback(db as unknown as PrismaClient, {
+      emailMessageId: "msg-1",
+      feedbackType: "mark_urgent",
+    });
+
+    // Corrective feedback creates no rule, but still resolves the sender so the
+    // caller can re-classify that sender's stored mail.
+    expect(db.smartRule.create).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      ruleCreated: false,
+      ruleText: null,
+      senderEmail: "rachel@acme.com",
+    });
   });
 
   it("creates a prioritize rule from always_prioritize_sender feedback", async () => {
@@ -104,7 +122,7 @@ describe("applyFeedback", () => {
 
     expect(db.userFeedback.create).toHaveBeenCalledTimes(1);
     expect(db.smartRule.create).not.toHaveBeenCalled();
-    expect(result).toEqual({ ruleCreated: false, ruleText: null });
+    expect(result).toEqual({ ruleCreated: false, ruleText: null, senderEmail: null });
   });
 
   it("rejects an unknown feedback type before any rule work", async () => {

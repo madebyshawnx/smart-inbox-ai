@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Brain,
   Inbox,
   LogOut,
   Mail,
@@ -35,6 +36,7 @@ type LeftRailProps = {
   onOpenAsk: () => void;
   onOpenSearch: () => void;
   onOpenSettings: () => void;
+  onOpenLearned: () => void;
 };
 
 /**
@@ -53,6 +55,7 @@ export function LeftRail({
   onOpenAsk,
   onOpenSearch,
   onOpenSettings,
+  onOpenLearned,
 }: LeftRailProps) {
   return (
     <nav
@@ -95,6 +98,7 @@ export function LeftRail({
       <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-2 py-3">
         <AskButton collapsed={collapsed} onOpenAsk={onOpenAsk} />
         <SearchButton collapsed={collapsed} onOpenSearch={onOpenSearch} />
+        <LearnedButton collapsed={collapsed} onOpenLearned={onOpenLearned} />
 
         <div className="my-2 h-px bg-[var(--hairline)]" aria-hidden="true" />
 
@@ -178,6 +182,28 @@ function SearchButton({ collapsed, onOpenSearch }: SearchButtonProps) {
           <kbd className="font-sans text-[0.7rem] tracking-wide text-[var(--ink-500)]">⌘K</kbd>
         </>
       )}
+    </button>
+  );
+}
+
+type LearnedButtonProps = {
+  collapsed: boolean;
+  onOpenLearned: () => void;
+};
+
+function LearnedButton({ collapsed, onOpenLearned }: LearnedButtonProps) {
+  return (
+    <button
+      type="button"
+      onClick={onOpenLearned}
+      aria-label="What I've learned"
+      title={collapsed ? "What I've learned" : undefined}
+      className={`flex items-center rounded-[var(--radius-chip)] text-sm font-medium text-[var(--ink-500)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--ink-900)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
+        collapsed ? "h-9 w-9 justify-center self-center" : "w-full gap-2 px-3 py-2"
+      }`}
+    >
+      <Brain size={16} />
+      {!collapsed && <span className="flex-1 text-left">What I&rsquo;ve learned</span>}
     </button>
   );
 }

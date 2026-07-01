@@ -21,6 +21,10 @@ export type ApplyFeedbackResult = {
   // feedback isn't sender-scoped, the rule already existed, or the email is gone).
   ruleCreated: boolean;
   ruleText: string | null;
+  // The sender the feedback was given against, when the email could be resolved.
+  // Lets the caller trigger a targeted re-classification of that sender's stored
+  // mail so the correction visibly takes effect. Null when the email is gone.
+  senderEmail: string | null;
 };
 
 function describeSender(senderName: string, senderEmail: string): string {
@@ -35,20 +39,21 @@ export async function applyFeedback(
   // Always record the raw feedback first (validates the type, throws on unknown).
   await saveFeedback(db, input);
 
-  const isSenderRule =
-    input.feedbackType === "always_prioritize_sender" ||
-    input.feedbackType === "usually_ignore_sender";
-  if (!isSenderRule) {
-    return { ruleCreated: false, ruleText: null };
-  }
-
-  // A sender rule needs the email's sender, so look up the message.
+  // Resolve the sender for every feedback type — not just sender rules. Even
+  // corrective feedback (mark_urgent, safe_to_ignore, …) is attributed to a
+  // sender so the caller can re-classify that sender's stored mail and the
+  // feedback-summary guidance can take effect on the next pass.
   const email = await db.emailMessage.findUnique({
     where: { id: input.emailMessageId },
     select: { senderName: true, senderEmail: true },
   });
-  if (email === null || email === undefined) {
-    return { ruleCreated: false, ruleText: null };
+  const senderEmail = email?.senderEmail ?? null;
+
+  const isSenderRule =
+    input.feedbackType === "always_prioritize_sender" ||
+    input.feedbackType === "usually_ignore_sender";
+  if (!isSenderRule || email === null || email === undefined) {
+    return { ruleCreated: false, ruleText: null, senderEmail };
   }
 
   const sender = describeSender(email.senderName, email.senderEmail);
@@ -64,5 +69,5 @@ export async function applyFeedback(
         };
 
   const { created } = await ensureActiveRule(db, { ruleText, priorityWeight });
-  return { ruleCreated: created, ruleText };
+  return { ruleCreated: created, ruleText, senderEmail };
 }

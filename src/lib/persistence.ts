@@ -30,7 +30,7 @@ export const ALLOWED_FEEDBACK_TYPES = [
 
 export type FeedbackType = (typeof ALLOWED_FEEDBACK_TYPES)[number];
 
-function isAllowedFeedbackType(value: string): value is FeedbackType {
+export function isAllowedFeedbackType(value: string): value is FeedbackType {
   return (ALLOWED_FEEDBACK_TYPES as readonly string[]).includes(value);
 }
 

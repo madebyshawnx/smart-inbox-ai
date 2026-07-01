@@ -73,12 +73,25 @@ export function FeedbackButtons({ emailMessageId }: FeedbackButtonsProps) {
       if (!res.ok) {
         throw new Error(`Request failed (${res.status})`);
       }
-      const data = (await res.json()) as { ruleCreated?: boolean };
+      const data = (await res.json()) as { ruleCreated?: boolean; reclassified?: number };
       setStatus("saved");
       setSubmitted((prev) => new Set(prev).add(feedbackType));
       toast.success("Feedback saved");
       if (data.ruleCreated === true) {
         toast.success("Smart Rule added");
+      }
+      // The backend re-triages this sender's already-stored mail so the
+      // correction visibly takes effect. Surface that, then refresh the inbox so
+      // the updated classifications show without a manual reload.
+      const reclassified = data.reclassified ?? 0;
+      if (reclassified > 0) {
+        toast.success(`Updated ${reclassified} similar email${reclassified === 1 ? "" : "s"}`);
+        // Give the toasts a beat to register, then pull the fresh server-rendered
+        // triage (the page is force-dynamic, so a reload re-runs classification-aware
+        // data loading).
+        window.setTimeout(() => {
+          window.location.reload();
+        }, 900);
       }
     } catch {
       setStatus("error");

@@ -1,6 +1,15 @@
 "use client";
 
-import { AlertTriangle, ArrowLeft, CheckCircle2, Menu, Sparkles, X } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  Brain,
+  CheckCircle2,
+  ChevronRight,
+  Menu,
+  Sparkles,
+  X,
+} from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -10,6 +19,7 @@ import { AskInbox } from "./AskInbox";
 import { CommandPalette } from "./CommandPalette";
 import { ConnectGmailCard } from "./ConnectGmailCard";
 import { FeedbackButtons } from "./FeedbackButtons";
+import { LearnedPanel } from "./LearnedPanel";
 import { LeftRail } from "./LeftRail";
 import { OnboardingQuestionnaire } from "./OnboardingQuestionnaire";
 import { resolvePriorityTier, tierStyle } from "./priority-style";
@@ -114,6 +124,7 @@ export function InboxWorkspace({ data, hasRules = true }: InboxWorkspaceProps) {
 
   const [selectedId, setSelectedId] = useState<string | null>(() => orderedEmails[0]?.id ?? null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [learnedOpen, setLearnedOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [askOpen, setAskOpen] = useState(false);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
@@ -204,6 +215,21 @@ export function InboxWorkspace({ data, hasRules = true }: InboxWorkspaceProps) {
     document.body.style.cursor = "col-resize";
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
+  }, []);
+
+  // Keyboard resize (arrow keys on the focused divider) — accessible parity with
+  // the pointer drag; persists like the drag does.
+  const nudgeListWidth = useCallback((delta: number) => {
+    setListWidth((prev) => {
+      const next = Math.min(Math.max(prev + delta, LIST_WIDTH_MIN), LIST_WIDTH_MAX);
+      listWidthRef.current = next;
+      try {
+        window.localStorage.setItem(LIST_WIDTH_KEY, String(next));
+      } catch {
+        // Ignore storage failures — width still applies for this session.
+      }
+      return next;
+    });
   }, []);
 
   const toggleRailCollapsed = useCallback(() => {
@@ -380,6 +406,7 @@ export function InboxWorkspace({ data, hasRules = true }: InboxWorkspaceProps) {
             onOpenAsk={() => setAskOpen(true)}
             onOpenSearch={() => setPaletteOpen(true)}
             onOpenSettings={() => setSettingsOpen(true)}
+            onOpenLearned={() => setLearnedOpen(true)}
           />
         </div>
 
@@ -411,6 +438,10 @@ export function InboxWorkspace({ data, hasRules = true }: InboxWorkspaceProps) {
                 onOpenSettings={() => {
                   setMobileRailOpen(false);
                   setSettingsOpen(true);
+                }}
+                onOpenLearned={() => {
+                  setMobileRailOpen(false);
+                  setLearnedOpen(true);
                 }}
               />
             </div>
@@ -457,14 +488,28 @@ export function InboxWorkspace({ data, hasRules = true }: InboxWorkspaceProps) {
         </aside>
 
         {/* Drag handle — resize the list pane (desktop only). */}
+        {/* biome-ignore lint/a11y/useSemanticElements: a draggable resize separator has no semantic HTML equivalent */}
         <div
           role="separator"
           aria-orientation="vertical"
           aria-label="Resize inbox list"
+          aria-valuenow={Math.round(listWidth)}
+          aria-valuemin={LIST_WIDTH_MIN}
+          aria-valuemax={LIST_WIDTH_MAX}
+          tabIndex={0}
           onPointerDown={startListResize}
+          onKeyDown={(event) => {
+            if (event.key === "ArrowLeft") {
+              event.preventDefault();
+              nudgeListWidth(-24);
+            } else if (event.key === "ArrowRight") {
+              event.preventDefault();
+              nudgeListWidth(24);
+            }
+          }}
           className={`${
             mobileDetailOpen ? "hidden" : "hidden md:block"
-          } group relative w-1 shrink-0 cursor-col-resize touch-none bg-[var(--hairline)] transition-colors hover:bg-[var(--accent)]`}
+          } group relative w-1 shrink-0 cursor-col-resize touch-none bg-[var(--hairline)] transition-colors hover:bg-[var(--accent)] focus-visible:bg-[var(--accent)] focus-visible:outline-none`}
         >
           <span className="absolute inset-y-0 -left-1 -right-1" aria-hidden="true" />
         </div>
@@ -501,7 +546,13 @@ export function InboxWorkspace({ data, hasRules = true }: InboxWorkspaceProps) {
         open={settingsOpen}
         onOpenChange={setSettingsOpen}
         onOpenOnboarding={() => setOnboardingOpen(true)}
+        onOpenLearned={() => {
+          setSettingsOpen(false);
+          setLearnedOpen(true);
+        }}
       />
+
+      <LearnedPanel open={learnedOpen} onOpenChange={setLearnedOpen} />
 
       <OnboardingQuestionnaire open={onboardingOpen} onClose={closeOnboarding} />
 
@@ -749,9 +800,15 @@ type SettingsDrawerProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onOpenOnboarding: () => void;
+  onOpenLearned: () => void;
 };
 
-function SettingsDrawer({ open, onOpenChange, onOpenOnboarding }: SettingsDrawerProps) {
+function SettingsDrawer({
+  open,
+  onOpenChange,
+  onOpenOnboarding,
+  onOpenLearned,
+}: SettingsDrawerProps) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent aria-describedby={undefined}>
@@ -763,6 +820,31 @@ function SettingsDrawer({ open, onOpenChange, onOpenOnboarding }: SettingsDrawer
 
         <div className="flex flex-col gap-6 px-5 py-5">
           <ConnectGmailCard />
+          <button
+            type="button"
+            onClick={onOpenLearned}
+            className="group flex items-center gap-3 rounded-[var(--radius-card)] border border-[var(--hairline)] bg-[var(--surface-raised)] px-4 py-3.5 text-left transition-colors hover:border-[var(--accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+          >
+            <span
+              aria-hidden="true"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[var(--accent-soft)] text-[var(--accent)]"
+            >
+              <Brain size={18} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-semibold tracking-tight text-[var(--ink-900)]">
+                What I&rsquo;ve learned
+              </span>
+              <span className="block text-[0.8rem] text-[var(--ink-500)]">
+                See how your feedback shapes triage.
+              </span>
+            </span>
+            <ChevronRight
+              size={16}
+              className="shrink-0 text-[var(--ink-500)] transition-colors group-hover:text-[var(--accent)]"
+              aria-hidden="true"
+            />
+          </button>
           <SuggestedRules />
           <section aria-labelledby="settings-rules-heading" className="flex flex-col gap-3">
             <div>

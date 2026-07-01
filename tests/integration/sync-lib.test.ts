@@ -30,6 +30,13 @@ vi.mock("@/lib/rules", () => ({
   loadActiveRuleTexts: vi.fn().mockResolvedValue([]),
 }));
 
+// runSync now also summarises stored feedback per sender. The pure summariser is
+// unit-tested elsewhere; here we stub it so runSync's own logic is isolated.
+vi.mock("@/lib/feedback-summary", () => ({
+  loadSenderFeedbackSummary: vi.fn().mockResolvedValue([]),
+  summarizeFeedbackBySender: vi.fn().mockReturnValue([]),
+}));
+
 // classifyEmail returns a result keyed off the email's sourceId so we can shape
 // per-email statuses in each test.
 const classifyEmail = vi.fn<(...args: unknown[]) => Promise<ClassifyResult>>();
@@ -47,7 +54,11 @@ vi.mock("@/lib/classification/anthropic-client", () => ({
 
 import { runSync } from "@/lib/sync";
 
-const db = {} as PrismaClient;
+// runSync reads stored feedback to build per-sender guidance; an empty result
+// keeps these tests focused on the classify/skip/reclassify counting logic.
+const db = {
+  userFeedback: { findMany: vi.fn().mockResolvedValue([]) },
+} as unknown as PrismaClient;
 
 function email(sourceId: string): RawEmail {
   return {
