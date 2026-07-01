@@ -5,6 +5,8 @@ import {
   buildRawReplyMessage,
   createReplyDraft,
   type FetchFn,
+  fetchUnsubscribeInfo,
+  performOneClickUnsubscribe,
   unarchiveMessage,
 } from "../../src/lib/google/gmail-actions";
 import { GMAIL_WRITE_SCOPES, hasWriteScopes } from "../../src/lib/google/oauth";
@@ -161,5 +163,77 @@ describe("createReplyDraft", () => {
         fetchFn,
       ),
     ).rejects.toThrow(/draft id/);
+  });
+});
+
+describe("fetchUnsubscribeInfo", () => {
+  it("requests the List-Unsubscribe headers via metadata format (read-only)", async () => {
+    const fetchFn = okJson({
+      payload: {
+        headers: [
+          { name: "List-Unsubscribe", value: "<https://ex.com/u>, <mailto:x@ex.com>" },
+          { name: "List-Unsubscribe-Post", value: "List-Unsubscribe=One-Click" },
+        ],
+      },
+    });
+
+    const info = await fetchUnsubscribeInfo("token-x", "m1", fetchFn);
+
+    const mock = fetchFn as unknown as ReturnType<typeof vi.fn>;
+    const [url, init] = mock.mock.calls[0];
+    expect(url).toContain("/messages/m1");
+    expect(url).toContain("format=metadata");
+    expect(url).toContain("metadataHeaders=List-Unsubscribe");
+    expect(url).toContain("metadataHeaders=List-Unsubscribe-Post");
+    // Read-only: no POST, no modify/trash.
+    expect(init?.method ?? "GET").toBe("GET");
+    expect(url).not.toContain("/modify");
+
+    expect(info).toEqual({
+      httpsUrl: "https://ex.com/u",
+      mailto: "x@ex.com",
+      oneClick: true,
+    });
+  });
+
+  it("returns mailto-only (not one-click) when no https URL is present", async () => {
+    const fetchFn = okJson({
+      payload: { headers: [{ name: "List-Unsubscribe", value: "<mailto:x@ex.com>" }] },
+    });
+    const info = await fetchUnsubscribeInfo("token-x", "m1", fetchFn);
+    expect(info).toEqual({ httpsUrl: null, mailto: "x@ex.com", oneClick: false });
+  });
+
+  it("throws (status only, no token leak) on a Gmail error", async () => {
+    const fetchFn = vi.fn(async () => new Response("nope", { status: 401 })) as unknown as FetchFn;
+    await expect(fetchUnsubscribeInfo("secret-token", "m1", fetchFn)).rejects.toThrow(/401/);
+    await expect(fetchUnsubscribeInfo("secret-token", "m1", fetchFn)).rejects.not.toThrow(
+      /secret-token/,
+    );
+  });
+});
+
+describe("performOneClickUnsubscribe", () => {
+  it("POSTs the RFC 8058 one-click body to the https URL (never sends email)", async () => {
+    const fetchFn = vi.fn(async () => new Response("", { status: 200 })) as unknown as FetchFn;
+    await performOneClickUnsubscribe("https://ex.com/u?id=1", fetchFn);
+
+    const mock = fetchFn as unknown as ReturnType<typeof vi.fn>;
+    const [url, init] = mock.mock.calls[0];
+    expect(url).toBe("https://ex.com/u?id=1");
+    expect(init.method).toBe("POST");
+    expect(init.body).toBe("List-Unsubscribe=One-Click");
+    expect(init.headers["Content-Type"]).toBe("application/x-www-form-urlencoded");
+  });
+
+  it("refuses to POST a non-https URL", async () => {
+    const fetchFn = vi.fn() as unknown as FetchFn;
+    await expect(performOneClickUnsubscribe("http://ex.com/u", fetchFn)).rejects.toThrow(/https/);
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it("throws (status only) when the endpoint rejects", async () => {
+    const fetchFn = vi.fn(async () => new Response("no", { status: 500 })) as unknown as FetchFn;
+    await expect(performOneClickUnsubscribe("https://ex.com/u", fetchFn)).rejects.toThrow(/500/);
   });
 });

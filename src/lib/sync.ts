@@ -1,12 +1,14 @@
 import type { PrismaClient } from "@prisma/client";
 import { createAnthropicClient } from "./classification/anthropic-client";
 import { classifyEmail, type RawEmail } from "./classification/classify";
+import { extractGmailMessageId } from "./email-actions";
 import {
   loadSenderFeedbackSummary,
   type SenderFeedbackRecord,
   summarizeFeedbackBySender,
 } from "./feedback-summary";
 import { fetchRecentEmails } from "./google/gmail";
+import { archiveMessage } from "./google/gmail-actions";
 import { getAccessToken } from "./google/tokens";
 import { type FeedbackType, findClassifiedSourceIds, saveClassifiedEmail } from "./persistence";
 import { loadActiveRuleTexts } from "./rules";
@@ -259,4 +261,50 @@ export async function reclassifyStoredBySender(
   }
 
   return { reclassified, needsReview, total: emails.length };
+}
+
+export type ArchiveBySenderCounts = {
+  archived: number;
+  errors: number;
+  total: number;
+};
+
+/**
+ * Archive every stored Gmail message from a given sender, in Gmail. Best-effort
+ * and per-message: one failure never aborts the rest. Reuses the SAFE
+ * {@link archiveMessage} (removeLabelIds:["INBOX"]) — nothing is trashed or
+ * deleted, so this is fully reversible via un-archive.
+ *
+ * The access token is passed in (fetched once by the caller) so we don't refresh
+ * per message. Sample-fixture rows (no `gmail:` sourceId prefix) are skipped
+ * silently, not counted as errors.
+ */
+export async function archiveStoredBySender(
+  db: PrismaClient,
+  senderEmail: string,
+  accessToken: string,
+): Promise<ArchiveBySenderCounts> {
+  const rows = await db.emailMessage.findMany({
+    where: { senderEmail },
+    select: { sourceId: true },
+  });
+
+  let archived = 0;
+  let errors = 0;
+  let total = 0;
+  for (const row of rows) {
+    const gmailMessageId = extractGmailMessageId(row.sourceId);
+    if (gmailMessageId === null) {
+      continue;
+    }
+    total += 1;
+    try {
+      await archiveMessage(accessToken, gmailMessageId);
+      archived += 1;
+    } catch {
+      errors += 1;
+    }
+  }
+
+  return { archived, errors, total };
 }

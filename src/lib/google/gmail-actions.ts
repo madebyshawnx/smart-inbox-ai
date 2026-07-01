@@ -10,11 +10,17 @@
  *    that calls users.messages.send or users.drafts.send — this app can prepare
  *    a reply for the user to review and send themselves, never send on their
  *    behalf.
+ *  - Unsubscribe uses ONLY an HTTPS List-Unsubscribe URL via RFC 8058 one-click
+ *    (POST body "List-Unsubscribe=One-Click"). There is NO code path that emails
+ *    a mailto: unsubscribe — that would mean sending mail on the user's behalf.
+ *    A mailto-only offer is returned to the caller, never acted on.
  *
  * Every function is small and takes the access token + a `fetch` implementation
  * so it stays pure-ish and unit-testable (inject a fake fetch, assert the exact
  * request shape) without hitting the network or the Google SDK.
  */
+
+import { type ParsedListUnsubscribe, parseListUnsubscribe } from "@/lib/unsubscribe";
 
 const GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me";
 
@@ -145,4 +151,64 @@ export async function createReplyDraft(
   }
 
   return { draftId: result.id, messageId: result.message?.id ?? null };
+}
+
+/**
+ * Fetch the List-Unsubscribe + List-Unsubscribe-Post headers for a message and
+ * return the safe, parsed result. Uses the metadata format (headers only, no
+ * body) which needs only gmail.readonly. Read-only: this never modifies the
+ * message.
+ */
+export async function fetchUnsubscribeInfo(
+  accessToken: string,
+  gmailMessageId: string,
+  fetchFn: FetchFn = fetch,
+): Promise<ParsedListUnsubscribe> {
+  const path =
+    `/messages/${gmailMessageId}` +
+    `?format=metadata&metadataHeaders=List-Unsubscribe&metadataHeaders=List-Unsubscribe-Post`;
+  const res = await fetchFn(`${GMAIL_API}${path}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) {
+    // Never echo the token or full response body — surface status only.
+    throw new Error(`Gmail API request failed (${res.status})`);
+  }
+  const data = (await res.json()) as {
+    payload?: { headers?: Array<{ name: string; value: string }> };
+  };
+
+  const headers = data.payload?.headers ?? [];
+  const find = (name: string): string | null => {
+    const match = headers.find((h) => h.name.toLowerCase() === name.toLowerCase());
+    return match?.value ?? null;
+  };
+
+  return parseListUnsubscribe(find("List-Unsubscribe"), find("List-Unsubscribe-Post"));
+}
+
+/**
+ * Perform an RFC 8058 one-click unsubscribe: POST to the sender's HTTPS
+ * List-Unsubscribe URL with the required `List-Unsubscribe=One-Click` form body.
+ *
+ * HARD SAFETY: this ONLY ever POSTs to an https URL. It does not, and must not,
+ * send email — mailto unsubscribes are handled by the UI, never here. Throws
+ * (status only, no token/body leak) if the sender's endpoint rejects the POST.
+ */
+export async function performOneClickUnsubscribe(
+  httpsUrl: string,
+  fetchFn: FetchFn = fetch,
+): Promise<void> {
+  if (!httpsUrl.toLowerCase().startsWith("https://")) {
+    // Defense in depth: never POST to a non-https target.
+    throw new Error("Unsubscribe URL must be https");
+  }
+  const res = await fetchFn(httpsUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: "List-Unsubscribe=One-Click",
+  });
+  if (!res.ok) {
+    throw new Error(`Unsubscribe request failed (${res.status})`);
+  }
 }

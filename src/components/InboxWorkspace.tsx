@@ -2,6 +2,7 @@
 
 import {
   AlertTriangle,
+  Archive,
   ArrowLeft,
   Brain,
   CheckCircle2,
@@ -15,7 +16,7 @@ import {
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import type { DashboardData, EmailCard } from "@/lib/dashboard-types";
+import type { BucketKey, DashboardData, EmailCard } from "@/lib/dashboard-types";
 import {
   buildSections,
   filterBySelectedBucket,
@@ -60,6 +61,18 @@ const LIST_WIDTH_MAX = 640;
 const LIST_WIDTH_DEFAULT = 380;
 // localStorage key: ids of emails the user has opened (shown as "read"/muted).
 const VIEWED_KEY = "smart-inbox:viewed-ids";
+
+// Low-signal buckets that get a per-section "Archive all" affordance. Cleaning
+// these out in one action is the whole point of the bucket; higher-signal
+// buckets deliberately have no bulk sweep so nothing important is cleared en masse.
+const BULK_ARCHIVE_BUCKETS: ReadonlySet<BucketKey> = new Set([
+  "safe_to_ignore",
+  "low_priority",
+  "read_later",
+]);
+
+// How long the bulk "Undo" toast stays actionable.
+const BULK_UNDO_WINDOW_MS = 8000;
 
 // Derive a tight, single-line brief sentence from the raw counts — not the long
 // paragraph. e.g. "2 emails · 1 needs attention · 1 to read".
@@ -136,6 +149,85 @@ export function InboxWorkspace({ data, hasRules = true }: InboxWorkspaceProps) {
       return next;
     });
   }, []);
+
+  // Optimistically archive/restore a whole set of ids at once (bulk cleanup).
+  const archiveMany = useCallback((ids: ReadonlyArray<string>) => {
+    setArchivedIds((prev) => {
+      const next = new Set(prev);
+      for (const id of ids) {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
+
+  const restoreMany = useCallback((ids: ReadonlyArray<string>) => {
+    setArchivedIds((prev) => {
+      const next = new Set(prev);
+      for (const id of ids) {
+        next.delete(id);
+      }
+      return next;
+    });
+  }, []);
+
+  // Per-bucket "Archive all": confirm, optimistically clear the section, POST the
+  // explicit ids to the bulk-archive route, and offer an undo that restores them.
+  // Reversible end to end (bulk-archive only removes the INBOX label).
+  const bulkArchiveBucket = useCallback(
+    async (label: string, ids: ReadonlyArray<string>) => {
+      if (ids.length === 0) {
+        return;
+      }
+      const confirmed = window.confirm(
+        `Archive all ${ids.length} email${ids.length === 1 ? "" : "s"} in “${label}”? ` +
+          "They’re removed from your inbox in Gmail — reversible, never deleted.",
+      );
+      if (!confirmed) {
+        return;
+      }
+
+      // Optimistic: clear the whole section immediately.
+      archiveMany(ids);
+      try {
+        const res = await fetch("/api/emails/bulk-archive", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids }),
+        });
+        if (!res.ok) {
+          throw new Error(`bulk archive failed (${res.status})`);
+        }
+        const data = (await res.json()) as { archived?: number };
+        const archived = data.archived ?? ids.length;
+        toast.success(`Archived ${archived} email${archived === 1 ? "" : "s"}`, {
+          description: `Cleared “${label}” from your inbox.`,
+          duration: BULK_UNDO_WINDOW_MS,
+          action: {
+            label: "Undo",
+            onClick: () => {
+              // Restore the list instantly, then un-archive each in Gmail
+              // (re-add the INBOX label) via the reversible per-email route.
+              restoreMany(ids);
+              void Promise.all(
+                ids.map((id) =>
+                  fetch(`/api/emails/${id}/archive`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ undo: true }),
+                  }).catch(() => null),
+                ),
+              );
+            },
+          },
+        });
+      } catch {
+        restoreMany(ids);
+        toast.error("Couldn’t archive these — try reconnecting Gmail.");
+      }
+    },
+    [archiveMany, restoreMany],
+  );
 
   // Buckets with optimistically-archived emails filtered out.
   const liveBuckets = useMemo(() => {
@@ -583,6 +675,15 @@ export function InboxWorkspace({ data, hasRules = true }: InboxWorkspaceProps) {
                     expandedThreads={expandedThreads}
                     onSelect={selectEmail}
                     onToggleThread={toggleThread}
+                    onArchiveAll={
+                      BULK_ARCHIVE_BUCKETS.has(section.key)
+                        ? () =>
+                            bulkArchiveBucket(
+                              section.label,
+                              section.emails.map((email) => email.id),
+                            )
+                        : undefined
+                    }
                   />
                 ))}
               </ul>
@@ -769,6 +870,8 @@ type SectionListProps = {
   expandedThreads: ReadonlySet<string>;
   onSelect: (id: string) => void;
   onToggleThread: (threadId: string) => void;
+  // Present only for low-signal buckets: sweeps the whole section (archive all).
+  onArchiveAll?: () => void;
 };
 
 // One bucket section: groups its emails into threads and renders each group.
@@ -781,11 +884,16 @@ function SectionList({
   expandedThreads,
   onSelect,
   onToggleThread,
+  onArchiveAll,
 }: SectionListProps) {
   const groups = groupEmailsByThread(section.emails);
   return (
     <li>
-      <SectionHeader label={section.label} count={section.emails.length} />
+      <SectionHeader
+        label={section.label}
+        count={section.emails.length}
+        onArchiveAll={onArchiveAll}
+      />
       <ul>
         {groups.map((group) =>
           group.count > 1 ? (
@@ -885,15 +993,30 @@ function ThreadRow({ group, selectedId, viewedIds, expanded, onSelect, onToggle 
 type SectionHeaderProps = {
   label: string;
   count: number;
+  // Low-signal buckets get an "Archive all" sweep; omitted for everything else.
+  onArchiveAll?: () => void;
 };
 
-function SectionHeader({ label, count }: SectionHeaderProps) {
+function SectionHeader({ label, count, onArchiveAll }: SectionHeaderProps) {
   return (
-    <div className="sticky top-0 z-10 flex items-center justify-between bg-[var(--surface)]/95 px-5 pt-4 pb-1.5 backdrop-blur">
-      <h2 className="text-[0.7rem] font-semibold tracking-[0.12em] text-[var(--ink-500)] uppercase">
-        {label}
-      </h2>
-      <span className="text-[0.7rem] font-medium text-[var(--ink-500)]">{count}</span>
+    <div className="sticky top-0 z-10 flex items-center justify-between gap-2 bg-[var(--surface)]/95 px-5 pt-4 pb-1.5 backdrop-blur">
+      <div className="flex min-w-0 items-center gap-2">
+        <h2 className="truncate text-[0.7rem] font-semibold tracking-[0.12em] text-[var(--ink-500)] uppercase">
+          {label}
+        </h2>
+        <span className="text-[0.7rem] font-medium text-[var(--ink-500)]">{count}</span>
+      </div>
+      {onArchiveAll && count > 0 && (
+        <button
+          type="button"
+          onClick={onArchiveAll}
+          aria-label={`Archive all ${count} email${count === 1 ? "" : "s"} in ${label}`}
+          className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[var(--hairline)] bg-[var(--surface-raised)] px-2 py-0.5 text-[0.65rem] font-semibold text-[var(--ink-500)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+        >
+          <Archive size={11} aria-hidden="true" />
+          Archive all
+        </button>
+      )}
     </div>
   );
 }
@@ -1067,7 +1190,15 @@ function EmailDetail({ email, onBack, onArchived, onRestore }: EmailDetailProps)
             {confidencePct}% confidence
           </span>
         </div>
-        <ActionButtons emailMessageId={email.id} onArchived={onArchived} onRestore={onRestore} />
+        <ActionButtons
+          emailMessageId={email.id}
+          senderEmail={email.senderEmail}
+          senderName={email.senderName}
+          suggestedBucket={email.suggestedBucket}
+          category={email.category}
+          onArchived={onArchived}
+          onRestore={onRestore}
+        />
         <div className="border-t border-[var(--hairline)] pt-3">
           <FeedbackButtons emailMessageId={email.id} />
         </div>

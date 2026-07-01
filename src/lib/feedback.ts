@@ -71,3 +71,48 @@ export async function applyFeedback(
   const { created } = await ensureActiveRule(db, { ruleText, priorityWeight });
   return { ruleCreated: created, ruleText, senderEmail };
 }
+
+export type ScreenDecision = "in" | "out";
+
+export type ScreenSenderResult = {
+  // Whether a new Smart Rule was created (false if an identical active rule
+  // already existed — repeated screening of the same sender is idempotent).
+  ruleCreated: boolean;
+  ruleText: string;
+  senderEmail: string;
+  priorityWeight: number;
+};
+
+/**
+ * Screen a sender in or out by reusing the exact Smart-Rules machinery the
+ * feedback loop uses — no new table, no new feedback type.
+ *
+ *  - "in"  → a prioritize rule (weight {@link PRIORITIZE_SENDER_WEIGHT}).
+ *  - "out" → an ignore rule (weight {@link IGNORE_SENDER_WEIGHT}).
+ *
+ * Deduplication is handled by {@link ensureActiveRule} (exact active-text match),
+ * so clicking "screen out" twice creates one rule, not two. The screened-out
+ * sender's EXISTING stored mail is not touched here — the route archives it
+ * separately (reversible) so this stays a pure rule-writing helper.
+ */
+export async function screenSender(
+  db: PrismaClient,
+  senderEmail: string,
+  senderName: string,
+  decision: ScreenDecision,
+): Promise<ScreenSenderResult> {
+  const sender = describeSender(senderName, senderEmail);
+  const { ruleText, priorityWeight } =
+    decision === "in"
+      ? {
+          ruleText: `Always prioritize emails from ${sender}.`,
+          priorityWeight: PRIORITIZE_SENDER_WEIGHT,
+        }
+      : {
+          ruleText: `Treat emails from ${sender} as low priority unless they are clearly urgent.`,
+          priorityWeight: IGNORE_SENDER_WEIGHT,
+        };
+
+  const { created } = await ensureActiveRule(db, { ruleText, priorityWeight });
+  return { ruleCreated: created, ruleText, senderEmail, priorityWeight };
+}

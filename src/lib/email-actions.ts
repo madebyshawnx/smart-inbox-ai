@@ -43,6 +43,19 @@ export function extractGmailMessageId(sourceId: string): string | null {
   return id === "" ? null : id;
 }
 
+/**
+ * Resolve the internal EmailMessage ids whose classification's suggestedBucket
+ * matches the given bucket key. Used by bulk cleanup so the UI can archive an
+ * entire bucket (e.g. "safe_to_ignore") by key instead of enumerating ids.
+ */
+export async function loadEmailIdsByBucket(db: PrismaClient, bucketKey: string): Promise<string[]> {
+  const rows = await db.emailMessage.findMany({
+    where: { classification: { suggestedBucket: bucketKey } },
+    select: { id: true },
+  });
+  return rows.map((row) => row.id);
+}
+
 export async function loadEmailGmailRef(
   db: PrismaClient,
   emailMessageId: string,
