@@ -35,6 +35,7 @@ export function mapToEmailCard(
   return {
     id: message.id,
     sourceId: message.sourceId,
+    threadId: message.threadId ?? null,
     senderName: message.senderName,
     senderEmail: message.senderEmail,
     subject: message.subject,

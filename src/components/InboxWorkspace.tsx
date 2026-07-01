@@ -5,8 +5,10 @@ import {
   ArrowLeft,
   Brain,
   CheckCircle2,
+  ChevronDown,
   ChevronRight,
   Menu,
+  Search,
   Sparkles,
   X,
 } from "lucide-react";
@@ -14,12 +16,21 @@ import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { DashboardData, EmailCard } from "@/lib/dashboard-types";
-import { buildSections, filterBySelectedBucket, type SelectedBucket } from "@/lib/inbox-buckets";
+import {
+  buildSections,
+  filterBySelectedBucket,
+  filterSectionsByQuery,
+  groupEmailsByThread,
+  type ListSection,
+  type SelectedBucket,
+  type ThreadGroup,
+} from "@/lib/inbox-buckets";
 import { ActionButtons } from "./ActionButtons";
 import { AskInbox } from "./AskInbox";
 import { CommandPalette } from "./CommandPalette";
 import { ConnectGmailCard } from "./ConnectGmailCard";
 import { FeedbackButtons } from "./FeedbackButtons";
+import { InsightsPanel } from "./InsightsPanel";
 import { LearnedPanel } from "./LearnedPanel";
 import { LeftRail } from "./LeftRail";
 import { OnboardingQuestionnaire } from "./OnboardingQuestionnaire";
@@ -146,11 +157,15 @@ export function InboxWorkspace({ data, hasRules = true }: InboxWorkspaceProps) {
   );
 
   const [selectedBucket, setSelectedBucket] = useState<SelectedBucket>("all");
+  // Free-text list search. Filters the visible sections in-place (pure helper);
+  // an empty query is search-inactive and shows everything.
+  const [searchQuery, setSearchQuery] = useState("");
 
-  // The sections actually shown in the middle list, narrowed to the selection.
+  // The sections actually shown in the middle list: narrowed to the selected
+  // bucket, then filtered by the free-text query (empty query = everything).
   const visibleSections = useMemo(
-    () => filterBySelectedBucket(sections, selectedBucket),
-    [sections, selectedBucket],
+    () => filterSectionsByQuery(filterBySelectedBucket(sections, selectedBucket), searchQuery),
+    [sections, selectedBucket, searchQuery],
   );
 
   // Flatten the visible sections for keyboard navigation + default selection.
@@ -164,9 +179,25 @@ export function InboxWorkspace({ data, hasRules = true }: InboxWorkspaceProps) {
   const [selectedId, setSelectedId] = useState<string | null>(() => orderedEmails[0]?.id ?? null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [learnedOpen, setLearnedOpen] = useState(false);
+  const [insightsOpen, setInsightsOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [askOpen, setAskOpen] = useState(false);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
+  // Thread ids the user has expanded to reveal older replies. Collapsed by
+  // default; singletons are never in this set (they render as flat rows).
+  const [expandedThreads, setExpandedThreads] = useState<ReadonlySet<string>>(() => new Set());
+
+  const toggleThread = useCallback((threadId: string) => {
+    setExpandedThreads((prev) => {
+      const next = new Set(prev);
+      if (next.has(threadId)) {
+        next.delete(threadId);
+      } else {
+        next.add(threadId);
+      }
+      return next;
+    });
+  }, []);
   // Rail collapse (desktop, icon-only strip) — hydrated from localStorage below.
   const [railCollapsed, setRailCollapsed] = useState(false);
   // On narrow screens the rail opens as an overlay rather than sitting inline.
@@ -217,6 +248,7 @@ export function InboxWorkspace({ data, hasRules = true }: InboxWorkspaceProps) {
   const selectBucket = useCallback((bucket: SelectedBucket) => {
     setSelectedBucket(bucket);
     setSelectedId(null);
+    setSearchQuery("");
     setMobileRailOpen(false);
     setMobileDetailOpen(false);
   }, []);
@@ -319,6 +351,11 @@ export function InboxWorkspace({ data, hasRules = true }: InboxWorkspaceProps) {
   const handleListKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLElement>) => {
       if (orderedEmails.length === 0 || paletteOpen) {
+        return;
+      }
+      // Don't hijack typing in the list search box (j/k are literal there).
+      const target = event.target as HTMLElement;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") {
         return;
       }
       const currentIndex = orderedEmails.findIndex((email) => email.id === selectedEmail?.id);
@@ -478,6 +515,7 @@ export function InboxWorkspace({ data, hasRules = true }: InboxWorkspaceProps) {
             onOpenSearch={() => setPaletteOpen(true)}
             onOpenSettings={() => setSettingsOpen(true)}
             onOpenLearned={() => setLearnedOpen(true)}
+            onOpenInsights={() => setInsightsOpen(true)}
           />
         </div>
 
@@ -514,6 +552,10 @@ export function InboxWorkspace({ data, hasRules = true }: InboxWorkspaceProps) {
                   setMobileRailOpen(false);
                   setLearnedOpen(true);
                 }}
+                onOpenInsights={() => {
+                  setMobileRailOpen(false);
+                  setInsightsOpen(true);
+                }}
               />
             </div>
           </div>
@@ -528,31 +570,28 @@ export function InboxWorkspace({ data, hasRules = true }: InboxWorkspaceProps) {
             mobileDetailOpen ? "hidden" : "flex"
           } w-full shrink-0 flex-col md:flex md:w-[var(--list-w)]`}
         >
+          <ListSearch value={searchQuery} onChange={setSearchQuery} />
           <div className="min-h-0 flex-1 overflow-y-auto">
             {hasEmails ? (
               <ul className="flex flex-col py-2">
                 {visibleSections.map((section) => (
-                  <li key={section.key}>
-                    <SectionHeader label={section.label} count={section.emails.length} />
-                    <ul>
-                      {section.emails.map((email) => (
-                        <li key={email.id}>
-                          <EmailRow
-                            email={email}
-                            isSelected={email.id === selectedEmail?.id}
-                            isViewed={viewedIds.has(email.id)}
-                            onSelect={() => selectEmail(email.id)}
-                          />
-                        </li>
-                      ))}
-                    </ul>
-                  </li>
+                  <SectionList
+                    key={section.key}
+                    section={section}
+                    selectedId={selectedEmail?.id ?? null}
+                    viewedIds={viewedIds}
+                    expandedThreads={expandedThreads}
+                    onSelect={selectEmail}
+                    onToggleThread={toggleThread}
+                  />
                 ))}
               </ul>
             ) : (
               <div className="px-6 py-10">
                 <p className="text-sm leading-relaxed text-[var(--ink-500)]">
-                  No emails to triage yet. Connect Gmail and sync to get started.
+                  {searchQuery.trim() === ""
+                    ? "No emails to triage yet. Connect Gmail and sync to get started."
+                    : `No emails match “${searchQuery.trim()}”.`}
                 </p>
               </div>
             )}
@@ -631,6 +670,8 @@ export function InboxWorkspace({ data, hasRules = true }: InboxWorkspaceProps) {
 
       <LearnedPanel open={learnedOpen} onOpenChange={setLearnedOpen} />
 
+      <InsightsPanel open={insightsOpen} onOpenChange={setInsightsOpen} buckets={liveBuckets} />
+
       <OnboardingQuestionnaire open={onboardingOpen} onClose={closeOnboarding} />
 
       <CommandPalette
@@ -667,6 +708,177 @@ function TopBar({ glanceBrief, onOpenMobileRail }: TopBarProps) {
 
       <p className="min-w-0 flex-1 truncate text-sm text-[var(--ink-500)]">{glanceBrief}</p>
     </header>
+  );
+}
+
+type ListSearchProps = {
+  value: string;
+  onChange: (value: string) => void;
+};
+
+// Free-text search box pinned above the list. Escape clears (and if already
+// empty, blurs so the list keyboard nav takes over again).
+function ListSearch({ value, onChange }: ListSearchProps) {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  return (
+    <div className="shrink-0 border-b border-[var(--hairline)] px-3 py-2">
+      <div className="flex items-center gap-2 rounded-[var(--radius-chip)] border border-[var(--hairline)] bg-[var(--surface-raised)] px-2.5 py-1.5 transition-colors focus-within:border-[var(--accent)]">
+        <Search size={15} aria-hidden="true" className="shrink-0 text-[var(--ink-500)]" />
+        <input
+          ref={inputRef}
+          type="search"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              event.preventDefault();
+              event.stopPropagation();
+              if (value === "") {
+                inputRef.current?.blur();
+              } else {
+                onChange("");
+              }
+            }
+          }}
+          placeholder="Search this list…"
+          aria-label="Search triaged emails"
+          className="w-full bg-transparent text-sm text-[var(--ink-900)] outline-none placeholder:text-[var(--ink-500)]"
+        />
+        {value !== "" && (
+          <button
+            type="button"
+            onClick={() => {
+              onChange("");
+              inputRef.current?.focus();
+            }}
+            aria-label="Clear search"
+            className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--ink-500)] transition-colors hover:bg-[var(--surface-sunken)] hover:text-[var(--ink-900)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+          >
+            <X size={13} />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+type SectionListProps = {
+  section: ListSection;
+  selectedId: string | null;
+  viewedIds: ReadonlySet<string>;
+  expandedThreads: ReadonlySet<string>;
+  onSelect: (id: string) => void;
+  onToggleThread: (threadId: string) => void;
+};
+
+// One bucket section: groups its emails into threads and renders each group.
+// Singleton threads (count 1) render as today's flat EmailRow; multi-message
+// threads render a ThreadRow that expands to reveal older replies.
+function SectionList({
+  section,
+  selectedId,
+  viewedIds,
+  expandedThreads,
+  onSelect,
+  onToggleThread,
+}: SectionListProps) {
+  const groups = groupEmailsByThread(section.emails);
+  return (
+    <li>
+      <SectionHeader label={section.label} count={section.emails.length} />
+      <ul>
+        {groups.map((group) =>
+          group.count > 1 ? (
+            <ThreadRow
+              key={group.threadId}
+              group={group}
+              selectedId={selectedId}
+              viewedIds={viewedIds}
+              expanded={expandedThreads.has(group.threadId)}
+              onSelect={onSelect}
+              onToggle={() => onToggleThread(group.threadId)}
+            />
+          ) : (
+            <li key={group.head.id}>
+              <EmailRow
+                email={group.head}
+                isSelected={group.head.id === selectedId}
+                isViewed={viewedIds.has(group.head.id)}
+                onSelect={() => onSelect(group.head.id)}
+              />
+            </li>
+          ),
+        )}
+      </ul>
+    </li>
+  );
+}
+
+type ThreadRowProps = {
+  group: ThreadGroup;
+  selectedId: string | null;
+  viewedIds: ReadonlySet<string>;
+  expanded: boolean;
+  onSelect: (id: string) => void;
+  onToggle: () => void;
+};
+
+// A multi-message conversation: the newest message as the primary row plus a
+// small "N in thread" toggle. Expanding reveals the older replies indented,
+// each still an independent EmailRow (selection / read / archive per message).
+function ThreadRow({ group, selectedId, viewedIds, expanded, onSelect, onToggle }: ThreadRowProps) {
+  const olderCount = group.count - 1;
+  return (
+    <li>
+      <div className="relative">
+        <EmailRow
+          email={group.head}
+          isSelected={group.head.id === selectedId}
+          isViewed={viewedIds.has(group.head.id)}
+          onSelect={() => onSelect(group.head.id)}
+        />
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={expanded}
+          aria-label={
+            expanded
+              ? `Collapse thread of ${group.count} messages`
+              : `Show ${olderCount} more in thread`
+          }
+          className="absolute top-2 right-3 flex items-center gap-1 rounded-full border border-[var(--hairline)] bg-[var(--surface-raised)] px-2 py-0.5 text-[0.65rem] font-semibold text-[var(--ink-500)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+        >
+          <ChevronDown
+            size={11}
+            aria-hidden="true"
+            className={`transition-transform ${expanded ? "rotate-180" : ""}`}
+          />
+          {group.count} in thread
+        </button>
+      </div>
+      <AnimatePresence initial={false}>
+        {expanded && (
+          <motion.ul
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.18, ease: "easeOut" }}
+            className="overflow-hidden border-l-2 border-[var(--hairline)] pl-1"
+          >
+            {group.others.map((email) => (
+              <li key={email.id}>
+                <EmailRow
+                  email={email}
+                  isSelected={email.id === selectedId}
+                  isViewed={viewedIds.has(email.id)}
+                  onSelect={() => onSelect(email.id)}
+                />
+              </li>
+            ))}
+          </motion.ul>
+        )}
+      </AnimatePresence>
+    </li>
   );
 }
 
@@ -735,6 +947,7 @@ function EmailRow({ email, isSelected, isViewed, onSelect }: EmailRowProps) {
             {time && <span className="text-[0.7rem] text-[var(--ink-500)]">{time}</span>}
             {!isViewed && (
               <span
+                role="img"
                 aria-label="Unread"
                 className="h-2 w-2 rounded-full bg-[var(--accent)]"
                 title="Unread"

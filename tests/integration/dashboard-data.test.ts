@@ -86,6 +86,18 @@ describe("loadDashboardData", () => {
     expect(card.receivedAt).toBe("2026-06-25T08:00:00.000Z");
   });
 
+  it("exposes threadId on the mapped card, defaulting to null when absent", async () => {
+    const db = mockPrismaReturning([
+      makeRow("threaded", "needs_attention", 90, { threadId: "T-42" }),
+      makeRow("solo", "read_later", 50),
+    ]);
+
+    const data = await loadDashboardData(db);
+
+    expect(data.buckets.needs_attention[0].threadId).toBe("T-42");
+    expect(data.buckets.read_later[0].threadId).toBeNull();
+  });
+
   it("computes brief counts from the reconstructed classification records", async () => {
     const db = mockPrismaReturning([
       makeRow("a", "needs_attention", 90),

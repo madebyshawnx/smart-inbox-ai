@@ -31,6 +31,10 @@ export const BUCKET_LABELS: Record<BucketKey, string> = {
 export type EmailCard = {
   id: string;
   sourceId: string;
+  // Gmail conversation id shared by every message in a thread. Optional in the
+  // persistence layer (older/sample rows may lack it), so null-safe here. Used
+  // purely for read-only thread grouping in the list; never groups when null.
+  threadId: string | null;
   senderName: string;
   senderEmail: string;
   subject: string;

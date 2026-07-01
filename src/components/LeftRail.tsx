@@ -10,6 +10,7 @@ import {
   Search,
   Settings,
   Sparkles,
+  TrendingUp,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
@@ -37,6 +38,7 @@ type LeftRailProps = {
   onOpenSearch: () => void;
   onOpenSettings: () => void;
   onOpenLearned: () => void;
+  onOpenInsights: () => void;
 };
 
 /**
@@ -56,6 +58,7 @@ export function LeftRail({
   onOpenSearch,
   onOpenSettings,
   onOpenLearned,
+  onOpenInsights,
 }: LeftRailProps) {
   return (
     <nav
@@ -99,6 +102,7 @@ export function LeftRail({
         <AskButton collapsed={collapsed} onOpenAsk={onOpenAsk} />
         <SearchButton collapsed={collapsed} onOpenSearch={onOpenSearch} />
         <LearnedButton collapsed={collapsed} onOpenLearned={onOpenLearned} />
+        <InsightsButton collapsed={collapsed} onOpenInsights={onOpenInsights} />
 
         <div className="my-2 h-px bg-[var(--hairline)]" aria-hidden="true" />
 
@@ -204,6 +208,28 @@ function LearnedButton({ collapsed, onOpenLearned }: LearnedButtonProps) {
     >
       <Brain size={16} />
       {!collapsed && <span className="flex-1 text-left">What I&rsquo;ve learned</span>}
+    </button>
+  );
+}
+
+type InsightsButtonProps = {
+  collapsed: boolean;
+  onOpenInsights: () => void;
+};
+
+function InsightsButton({ collapsed, onOpenInsights }: InsightsButtonProps) {
+  return (
+    <button
+      type="button"
+      onClick={onOpenInsights}
+      aria-label="View insights and analytics"
+      title={collapsed ? "Insights" : undefined}
+      className={`flex items-center rounded-[var(--radius-chip)] text-sm font-medium text-[var(--ink-500)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--ink-900)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
+        collapsed ? "h-9 w-9 justify-center self-center" : "w-full gap-2 px-3 py-2"
+      }`}
+    >
+      <TrendingUp size={16} />
+      {!collapsed && <span className="flex-1 text-left">Insights</span>}
     </button>
   );
 }
