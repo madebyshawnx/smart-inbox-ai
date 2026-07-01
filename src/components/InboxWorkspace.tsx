@@ -47,6 +47,8 @@ const LIST_WIDTH_KEY = "smart-inbox:list-width";
 const LIST_WIDTH_MIN = 300;
 const LIST_WIDTH_MAX = 640;
 const LIST_WIDTH_DEFAULT = 380;
+// localStorage key: ids of emails the user has opened (shown as "read"/muted).
+const VIEWED_KEY = "smart-inbox:viewed-ids";
 
 // Derive a tight, single-line brief sentence from the raw counts — not the long
 // paragraph. e.g. "2 emails · 1 needs attention · 1 to read".
@@ -178,6 +180,9 @@ export function InboxWorkspace({ data, hasRules = true }: InboxWorkspaceProps) {
   // the pointer-move handler reads the latest without re-binding listeners.
   const [listWidth, setListWidth] = useState(LIST_WIDTH_DEFAULT);
   const listWidthRef = useRef(LIST_WIDTH_DEFAULT);
+  // Emails the user has opened — rendered as "read" (muted) so reviewed items are
+  // visually distinct from unread ones. Persisted so it survives sync/feedback reloads.
+  const [viewedIds, setViewedIds] = useState<ReadonlySet<string>>(() => new Set());
 
   const selectedEmail = useMemo(() => {
     if (selectedId === null) {
@@ -191,6 +196,20 @@ export function InboxWorkspace({ data, hasRules = true }: InboxWorkspaceProps) {
   const selectEmail = useCallback((id: string) => {
     setSelectedId(id);
     setMobileDetailOpen(true);
+    // Mark as read (opened) and persist so reviewed items stay muted across reloads.
+    setViewedIds((prev) => {
+      if (prev.has(id)) {
+        return prev;
+      }
+      const next = new Set(prev);
+      next.add(id);
+      try {
+        window.localStorage.setItem(VIEWED_KEY, JSON.stringify([...next]));
+      } catch {
+        // Ignore storage failures — read state still applies for this session.
+      }
+      return next;
+    });
   }, []);
 
   // Switching buckets resets the list view: clear selection (the memo falls back
@@ -225,6 +244,21 @@ export function InboxWorkspace({ data, hasRules = true }: InboxWorkspaceProps) {
       }
     } catch {
       // Ignore storage failures — default width applies.
+    }
+  }, []);
+
+  // Hydrate the set of already-opened (read) emails once on mount.
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(VIEWED_KEY);
+      if (raw !== null) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          setViewedIds(new Set(parsed.filter((id): id is string => typeof id === "string")));
+        }
+      }
+    } catch {
+      // Ignore storage/parse failures — everything just shows as unread.
     }
   }, []);
 
@@ -506,6 +540,7 @@ export function InboxWorkspace({ data, hasRules = true }: InboxWorkspaceProps) {
                           <EmailRow
                             email={email}
                             isSelected={email.id === selectedEmail?.id}
+                            isViewed={viewedIds.has(email.id)}
                             onSelect={() => selectEmail(email.id)}
                           />
                         </li>
@@ -654,13 +689,18 @@ function SectionHeader({ label, count }: SectionHeaderProps) {
 type EmailRowProps = {
   email: EmailCard;
   isSelected: boolean;
+  isViewed: boolean;
   onSelect: () => void;
 };
 
-function EmailRow({ email, isSelected, onSelect }: EmailRowProps) {
+function EmailRow({ email, isSelected, isViewed, onSelect }: EmailRowProps) {
   const tier = resolvePriorityTier(email.priorityLevel);
   const { accentVar } = tierStyle(tier);
   const time = formatTime(email.receivedAt);
+  // "Read" = already opened and not the current selection. Unread (and the
+  // selected row) stay emphasized; read rows mute so reviewed items are obvious.
+  const isRead = isViewed && !isSelected;
+  const emphasized = !isRead;
 
   return (
     <button
@@ -680,22 +720,33 @@ function EmailRow({ email, isSelected, onSelect }: EmailRowProps) {
       <span
         aria-hidden="true"
         className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
-        style={{ backgroundColor: accentVar }}
+        style={{ backgroundColor: accentVar, opacity: isRead ? 0.35 : 1 }}
       />
       <span className="min-w-0 flex-1">
         <span className="flex items-baseline justify-between gap-2">
           <span
             className={`truncate text-[0.8rem] ${
-              isSelected
-                ? "font-semibold text-[var(--ink-900)]"
-                : "font-medium text-[var(--ink-700)]"
+              isRead ? "font-normal text-[var(--ink-500)]" : "font-semibold text-[var(--ink-900)]"
             }`}
           >
             {email.senderName}
           </span>
-          {time && <span className="shrink-0 text-[0.7rem] text-[var(--ink-500)]">{time}</span>}
+          <span className="flex shrink-0 items-center gap-1.5">
+            {time && <span className="text-[0.7rem] text-[var(--ink-500)]">{time}</span>}
+            {!isViewed && (
+              <span
+                aria-label="Unread"
+                className="h-2 w-2 rounded-full bg-[var(--accent)]"
+                title="Unread"
+              />
+            )}
+          </span>
         </span>
-        <span className="mt-0.5 block truncate text-[0.85rem] font-medium text-[var(--ink-900)]">
+        <span
+          className={`mt-0.5 block truncate text-[0.85rem] ${
+            emphasized ? "font-semibold text-[var(--ink-900)]" : "font-normal text-[var(--ink-500)]"
+          }`}
+        >
           {email.subject}
         </span>
         <span className="mt-0.5 block truncate text-[0.75rem] text-[var(--ink-500)] capitalize">
